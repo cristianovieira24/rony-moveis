@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAdminApi } from "@/lib/admin-auth";
-import { getBucket, getDatabase } from "@/lib/server-data";
+import { deleteManagedBlobs, managedBlobKey } from "@/lib/blob-storage";
+import { getDatabase } from "@/lib/server-data";
 import { productInputSchema } from "../route";
 
 export const dynamic = "force-dynamic";
@@ -49,7 +50,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         crypto.randomUUID(),
         id,
         url,
-        url.startsWith("/api/media/") ? url.slice("/api/media/".length) : null,
+        managedBlobKey(url),
         input.name,
         index,
       ),
@@ -59,12 +60,15 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   try {
     await db.batch(statements);
     const retained = new Set(input.images);
-    const bucket = await getBucket();
-    await Promise.all(
-      (previousImages.results ?? [])
-        .filter((image) => image.object_key && !retained.has(image.source_url))
-        .map((image) => bucket.delete(image.object_key as string)),
-    );
+    try {
+      await deleteManagedBlobs(
+        (previousImages.results ?? [])
+          .filter((image) => image.object_key && !retained.has(image.source_url))
+          .map((image) => image.object_key),
+      );
+    } catch (error) {
+      console.error("Falha ao remover imagens antigas do produto", error);
+    }
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("Falha ao editar produto", error);
@@ -82,7 +86,10 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
     .all<{ object_key: string }>();
   await db.prepare("DELETE FROM product_images WHERE product_id = ?").bind(id).run();
   await db.prepare("DELETE FROM products WHERE id = ?").bind(id).run();
-  const bucket = await getBucket();
-  await Promise.all((images.results ?? []).map((image) => bucket.delete(image.object_key)));
+  try {
+    await deleteManagedBlobs((images.results ?? []).map((image) => image.object_key));
+  } catch (error) {
+    console.error("Falha ao remover imagens do produto excluído", error);
+  }
   return NextResponse.json({ ok: true });
 }

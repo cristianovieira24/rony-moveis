@@ -1,5 +1,6 @@
 "use client";
 
+import { upload } from "@vercel/blob/client";
 import {
   ArrowLeft,
   ArrowRight,
@@ -32,6 +33,16 @@ const interests = [
 
 const budgets = ["Até R$ 2 mil", "R$ 2 a 5 mil", "R$ 5 a 10 mil", "Acima de R$ 10 mil", "Prefiro conversar"];
 const timelines = ["O quanto antes", "Nos próximos 30 dias", "Entre 1 e 3 meses", "Ainda estou pesquisando"];
+
+function referencePath(file: File) {
+  const safeName = file.name
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9.]+/g, "-")
+    .replace(/^-|-$/g, "") || "referencia.jpg";
+  return `quotes/${Date.now()}-${crypto.randomUUID()}-${safeName}`;
+}
 
 export function QuoteWizard() {
   const { items } = useSelection();
@@ -75,22 +86,34 @@ export function QuoteWizard() {
     setSubmitting(true);
     setError("");
 
-    const payload = new FormData();
-    payload.set("name", name);
-    payload.set("phone", phone);
-    payload.set("email", email);
-    payload.set("city", city);
-    payload.set("projectType", projectType);
-    payload.set("categories", JSON.stringify(categories));
-    payload.set("selectedProducts", JSON.stringify(items.map((item) => ({ name: item.name, slug: item.slug, quantity: item.quantity }))));
-    payload.set("dimensions", dimensions);
-    payload.set("budget", budget);
-    payload.set("timeline", timeline);
-    payload.set("notes", notes);
-    files.forEach((file) => payload.append("files", file));
-
     try {
-      const response = await fetch("/api/quotes", { method: "POST", body: payload });
+      const uploadedFiles = await Promise.all(
+        files.map(async (file) => {
+          const blob = await upload(referencePath(file), file, {
+            access: "public",
+            handleUploadUrl: "/api/quote-upload",
+          });
+          return { url: blob.url, filename: file.name, contentType: file.type, size: file.size };
+        }),
+      );
+      const response = await fetch("/api/quotes", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          name,
+          phone,
+          email,
+          city,
+          projectType,
+          categories,
+          selectedProducts: items.map((item) => ({ name: item.name, slug: item.slug, quantity: item.quantity })),
+          dimensions,
+          budget,
+          timeline,
+          notes,
+          files: uploadedFiles,
+        }),
+      });
       const data = (await response.json()) as { whatsappUrl?: string; error?: string };
       if (!response.ok || !data.whatsappUrl) throw new Error(data.error || "Não foi possível enviar agora.");
       window.location.href = data.whatsappUrl;
@@ -227,4 +250,3 @@ export function QuoteWizard() {
     </section>
   );
 }
-

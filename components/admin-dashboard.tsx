@@ -1,5 +1,6 @@
 "use client";
 
+import { upload } from "@vercel/blob/client";
 import {
   Archive,
   ArrowUpRight,
@@ -93,6 +94,16 @@ function makeSlug(value: string) {
     .replace(/^-|-$/g, "");
 }
 
+function uploadPath(prefix: string, file: File) {
+  const safeName = file.name
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9.]+/g, "-")
+    .replace(/^-|-$/g, "") || "imagem.jpg";
+  return `${prefix}/${Date.now()}-${crypto.randomUUID()}-${safeName}`;
+}
+
 export function AdminDashboard({
   products: initialProducts,
   categories,
@@ -150,14 +161,17 @@ export function AdminDashboard({
 
   async function uploadImage(file: File) {
     if (!draft) return;
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 8 * 1024 * 1024) {
+      flash("Use JPG, PNG ou WebP com no máximo 8 MB.");
+      return;
+    }
     setUploading(true);
-    const form = new FormData();
-    form.set("file", file);
     try {
-      const response = await fetch("/api/admin/upload", { method: "POST", body: form });
-      const data = (await response.json()) as { url?: string; error?: string };
-      if (!response.ok || !data.url) throw new Error(data.error || "Falha no upload.");
-      setDraft((current) => current ? { ...current, images: [...current.images, data.url as string] } : current);
+      const blob = await upload(uploadPath("catalog", file), file, {
+        access: "public",
+        handleUploadUrl: "/api/admin/upload",
+      });
+      setDraft((current) => current ? { ...current, images: [...current.images, blob.url] } : current);
       flash("Imagem enviada.");
     } catch (error) {
       flash(error instanceof Error ? error.message : "Não foi possível enviar a imagem.");
@@ -168,14 +182,17 @@ export function AdminDashboard({
   }
 
   async function uploadCampaignImage(file: File) {
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 8 * 1024 * 1024) {
+      flash("Use JPG, PNG ou WebP com no máximo 8 MB.");
+      return;
+    }
     setUploading(true);
-    const form = new FormData();
-    form.set("file", file);
     try {
-      const response = await fetch("/api/admin/upload", { method: "POST", body: form });
-      const data = (await response.json()) as { url?: string; error?: string };
-      if (!response.ok || !data.url) throw new Error(data.error || "Falha no upload.");
-      setCampaign((current) => ({ ...current, imageUrl: data.url as string }));
+      const blob = await upload(uploadPath("catalog", file), file, {
+        access: "public",
+        handleUploadUrl: "/api/admin/upload",
+      });
+      setCampaign((current) => ({ ...current, imageUrl: blob.url }));
       flash("Nova imagem carregada. Salve o destaque para publicar.");
     } catch (error) {
       flash(error instanceof Error ? error.message : "Não foi possível enviar a imagem.");

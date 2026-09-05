@@ -2,7 +2,7 @@ import type { Campaign, Category, Product } from "./types";
 
 export const WHATSAPP_NUMBER = "5562999981746";
 export const STORE_PHONE = "(62) 99998-1746";
-export const SITE_URL = "https://rony-moveis-goiania.creastezl896801.chatgpt.site";
+export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://ronymoveis.com").replace(/\/$/, "");
 export const STORE_ADDRESS =
   "Av. C-12, 108 — Setor Sudoeste, Goiânia — GO, 74305-010";
 

@@ -4058,6 +4058,69 @@ img {
   font-size: 12px;
 }
 
+.admin-login-page {
+  padding: 32px 20px;
+}
+
+.admin-login-card {
+  width: min(100%, 510px);
+  display: grid;
+  gap: 28px;
+  padding: clamp(28px, 6vw, 52px);
+  border: 1px solid rgba(90, 50, 31, .14);
+  border-radius: 28px;
+  background: rgba(255, 252, 247, .94);
+  box-shadow: 0 24px 80px rgba(73, 39, 23, .12);
+  text-align: left;
+}
+
+.admin-login-card > img {
+  width: min(100%, 260px);
+  margin: 0;
+}
+
+.admin-login-card h1,
+.admin-login-card p {
+  max-width: none;
+  margin-left: 0;
+  margin-right: 0;
+}
+
+.admin-login-card > a {
+  color: var(--wood);
+  font-weight: 700;
+  text-align: center;
+}
+
+.admin-login-form {
+  display: grid;
+  gap: 18px;
+}
+
+.admin-login-form label {
+  display: grid;
+  gap: 8px;
+  color: var(--ink);
+  font-size: .88rem;
+  font-weight: 700;
+}
+
+.admin-login-form input {
+  width: 100%;
+  min-height: 50px;
+  padding: 0 15px;
+  border: 1px solid rgba(90, 50, 31, .2);
+  border-radius: 12px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+}
+
+.admin-login-form input:focus {
+  border-color: var(--wood);
+  outline: 3px solid rgba(90, 50, 31, .1);
+}
+
 @media (max-width: 1180px) {
   .header-inner {
     grid-template-columns: 190px 1fr auto;

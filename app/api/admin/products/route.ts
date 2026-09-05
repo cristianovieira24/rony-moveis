@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAdminApi } from "@/lib/admin-auth";
+import { managedBlobKey } from "@/lib/blob-storage";
 import { getDatabase } from "@/lib/server-data";
 
 export const dynamic = "force-dynamic";
@@ -63,7 +64,7 @@ export async function POST(request: Request) {
         crypto.randomUUID(),
         id,
         url,
-        url.startsWith("/api/media/") ? url.slice("/api/media/".length) : null,
+        managedBlobKey(url),
         input.name,
         index,
       ),

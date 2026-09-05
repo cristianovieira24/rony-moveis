@@ -1,7 +1,10 @@
 import { seedCampaign, seedCategories, seedProducts } from "./catalog";
 import type { Campaign, Category, Product, QuoteSummary } from "./types";
+import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
 
 type Statement = {
+  query: string;
+  values: unknown[];
   bind: (...values: unknown[]) => Statement;
   all: <T = Record<string, unknown>>() => Promise<{ results?: T[] }>;
   first: <T = Record<string, unknown>>() => Promise<T | null>;
@@ -13,38 +16,112 @@ export type DatabaseBinding = {
   batch: (statements: Statement[]) => Promise<unknown>;
 };
 
-export type BucketBinding = {
-  put: (
-    key: string,
-    value: ArrayBuffer | ReadableStream,
-    options?: { httpMetadata?: { contentType?: string } },
-  ) => Promise<unknown>;
-  get: (key: string) => Promise<{
-    body: ReadableStream;
-    httpMetadata?: { contentType?: string };
-    writeHttpMetadata?: (headers: Headers) => void;
-  } | null>;
-  delete: (key: string) => Promise<unknown>;
-};
+let sqlClient: NeonQueryFunction<false, false> | null = null;
+let schemaPromise: Promise<void> | null = null;
 
-async function getRuntimeEnvironment() {
-  const runtime = await import("cloudflare:workers");
-  return runtime.env as unknown as {
-    DB?: DatabaseBinding;
-    BUCKET?: BucketBinding;
+function numberedPlaceholders(query: string) {
+  let index = 0;
+  return query.replace(/\?/g, () => `$${++index}`);
+}
+
+function getSqlClient() {
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) throw new Error("DATABASE_URL não foi configurada.");
+  sqlClient ??= neon(connectionString);
+  return sqlClient;
+}
+
+function makeStatement(sql: NeonQueryFunction<false, false>, query: string, values: unknown[] = []): Statement {
+  return {
+    query,
+    values,
+    bind: (...nextValues) => makeStatement(sql, query, nextValues),
+    all: async <T,>() => ({ results: (await sql.query(numberedPlaceholders(query), values)) as T[] }),
+    first: async <T,>() => {
+      const rows = (await sql.query(numberedPlaceholders(query), values)) as T[];
+      return rows[0] ?? null;
+    },
+    run: async () => sql.query(numberedPlaceholders(query), values),
   };
 }
 
-export async function getDatabase(): Promise<DatabaseBinding> {
-  const binding = (await getRuntimeEnvironment()).DB;
-  if (!binding) throw new Error("O banco de dados do site não está disponível.");
-  return binding;
+async function ensureDatabaseSchema(sql: NeonQueryFunction<false, false>) {
+  schemaPromise ??= (async () => {
+    const statements = [
+      `CREATE TABLE IF NOT EXISTS admins (
+        id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, name TEXT NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+      `CREATE TABLE IF NOT EXISTS categories (
+        id TEXT PRIMARY KEY, slug TEXT NOT NULL UNIQUE, name TEXT NOT NULL,
+        description TEXT NOT NULL DEFAULT '', sort_order INTEGER NOT NULL DEFAULT 0,
+        active INTEGER NOT NULL DEFAULT 1,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+      `CREATE TABLE IF NOT EXISTS products (
+        id TEXT PRIMARY KEY, slug TEXT NOT NULL UNIQUE, name TEXT NOT NULL,
+        eyebrow TEXT NOT NULL DEFAULT '', short_description TEXT NOT NULL DEFAULT '',
+        description TEXT NOT NULL DEFAULT '', category_id TEXT NOT NULL REFERENCES categories(id),
+        price_cents INTEGER, old_price_cents INTEGER, price_label TEXT, badge TEXT,
+        features_json TEXT NOT NULL DEFAULT '[]', active INTEGER NOT NULL DEFAULT 1,
+        featured INTEGER NOT NULL DEFAULT 0, sort_order INTEGER NOT NULL DEFAULT 0,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+      `CREATE TABLE IF NOT EXISTS product_images (
+        id TEXT PRIMARY KEY, product_id TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+        source_url TEXT NOT NULL, object_key TEXT, alt TEXT NOT NULL DEFAULT '',
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+      `CREATE TABLE IF NOT EXISTS campaigns (
+        id TEXT PRIMARY KEY, kind TEXT NOT NULL UNIQUE, eyebrow TEXT NOT NULL DEFAULT '',
+        title TEXT NOT NULL, description TEXT NOT NULL DEFAULT '', cta_label TEXT NOT NULL DEFAULT '',
+        cta_href TEXT NOT NULL DEFAULT '/', image_url TEXT NOT NULL, object_key TEXT,
+        active INTEGER NOT NULL DEFAULT 1,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+      `CREATE TABLE IF NOT EXISTS quote_requests (
+        id TEXT PRIMARY KEY, name TEXT NOT NULL, phone TEXT NOT NULL, email TEXT,
+        city TEXT NOT NULL, project_type TEXT NOT NULL, categories_json TEXT NOT NULL DEFAULT '[]',
+        selected_products_json TEXT NOT NULL DEFAULT '[]', dimensions TEXT NOT NULL DEFAULT '',
+        budget TEXT NOT NULL DEFAULT '', timeline TEXT NOT NULL DEFAULT '', notes TEXT NOT NULL DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'novo', created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+      `CREATE TABLE IF NOT EXISTS quote_files (
+        id TEXT PRIMARY KEY, quote_id TEXT NOT NULL REFERENCES quote_requests(id) ON DELETE CASCADE,
+        object_key TEXT NOT NULL, filename TEXT NOT NULL, content_type TEXT NOT NULL,
+        size INTEGER NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+      `CREATE TABLE IF NOT EXISTS site_settings (
+        key TEXT PRIMARY KEY, value TEXT NOT NULL,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+      "CREATE INDEX IF NOT EXISTS products_category_idx ON products(category_id)",
+      "CREATE INDEX IF NOT EXISTS products_sort_idx ON products(active, sort_order)",
+      "CREATE INDEX IF NOT EXISTS product_images_product_idx ON product_images(product_id, sort_order)",
+      "CREATE INDEX IF NOT EXISTS quote_requests_status_idx ON quote_requests(status, created_at)",
+    ];
+    for (const statement of statements) await sql.query(statement);
+  })();
+  await schemaPromise;
 }
 
-export async function getBucket(): Promise<BucketBinding> {
-  const binding = (await getRuntimeEnvironment()).BUCKET;
-  if (!binding) throw new Error("O armazenamento de imagens não está disponível.");
-  return binding;
+export async function getDatabase(): Promise<DatabaseBinding> {
+  const sql = getSqlClient();
+  await ensureDatabaseSchema(sql);
+  return {
+    prepare: (query) => makeStatement(sql, query),
+    batch: async (statements) => {
+      if (!statements.length) return [];
+      return sql.transaction(
+        statements.map((statement) => sql.query(numberedPlaceholders(statement.query), statement.values)),
+      );
+    },
+  };
 }
 
 export async function ensureSeedData() {
@@ -60,9 +137,10 @@ export async function ensureSeedData() {
     statements.push(
       db
         .prepare(
-          `INSERT OR IGNORE INTO categories
+          `INSERT INTO categories
            (id, slug, name, description, sort_order, active)
-           VALUES (?, ?, ?, ?, ?, 1)`,
+           VALUES (?, ?, ?, ?, ?, 1)
+           ON CONFLICT(id) DO NOTHING`,
         )
         .bind(
           category.id,
@@ -78,11 +156,12 @@ export async function ensureSeedData() {
     statements.push(
       db
         .prepare(
-          `INSERT OR IGNORE INTO products
+          `INSERT INTO products
            (id, slug, name, eyebrow, short_description, description, category_id,
             price_cents, old_price_cents, price_label, badge, features_json,
             active, featured, sort_order)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(id) DO NOTHING`,
         )
         .bind(
           product.id,
@@ -107,9 +186,10 @@ export async function ensureSeedData() {
       statements.push(
         db
           .prepare(
-            `INSERT OR IGNORE INTO product_images
+            `INSERT INTO product_images
              (id, product_id, source_url, object_key, alt, sort_order)
-             VALUES (?, ?, ?, NULL, ?, ?)`,
+             VALUES (?, ?, ?, NULL, ?, ?)
+             ON CONFLICT(id) DO NOTHING`,
           )
           .bind(
             `${product.id}-image-${imageIndex + 1}`,
@@ -125,9 +205,10 @@ export async function ensureSeedData() {
   statements.push(
     db
       .prepare(
-        `INSERT OR IGNORE INTO campaigns
+        `INSERT INTO campaigns
          (id, kind, eyebrow, title, description, cta_label, cta_href, image_url, active)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO NOTHING`,
       )
       .bind(
         seedCampaign.id,
@@ -350,7 +431,7 @@ export async function getAdminQuotes() {
   const filesByQuote = new Map<string, { url: string; filename: string }[]>();
   for (const file of files.results ?? []) {
     const list = filesByQuote.get(file.quote_id) ?? [];
-    list.push({ url: `/api/media/${file.object_key}`, filename: file.filename });
+    list.push({ url: file.object_key, filename: file.filename });
     filesByQuote.set(file.quote_id, list);
   }
   const parseArray = <T,>(value: string): T[] => {

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAdminApi } from "@/lib/admin-auth";
+import { deleteManagedBlobs, managedBlobKey } from "@/lib/blob-storage";
 import { getDatabase } from "@/lib/server-data";
 
 export const dynamic = "force-dynamic";
@@ -22,6 +23,10 @@ export async function PATCH(request: Request) {
   if (!parsed.success) return NextResponse.json({ error: "Revise os campos do destaque." }, { status: 400 });
   const input = parsed.data;
   const db = await getDatabase();
+  const previous = await db
+    .prepare("SELECT object_key FROM campaigns WHERE id = ?")
+    .bind(input.id)
+    .first<{ object_key: string | null }>();
   await db.prepare(
       `UPDATE campaigns SET eyebrow = ?, title = ?, description = ?, cta_label = ?, cta_href = ?,
        image_url = ?, object_key = ?, active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
@@ -33,10 +38,17 @@ export async function PATCH(request: Request) {
       input.ctaLabel,
       input.ctaHref,
       input.imageUrl,
-      input.imageUrl.startsWith("/api/media/") ? input.imageUrl.slice("/api/media/".length) : null,
+      managedBlobKey(input.imageUrl),
       input.active ? 1 : 0,
       input.id,
     )
     .run();
+  if (previous?.object_key && previous.object_key !== input.imageUrl) {
+    try {
+      await deleteManagedBlobs([previous.object_key]);
+    } catch (error) {
+      console.error("Falha ao remover imagem antiga do destaque", error);
+    }
+  }
   return NextResponse.json({ ok: true });
 }

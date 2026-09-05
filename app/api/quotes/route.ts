@@ -1,9 +1,17 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { getBucket, getDatabase } from "@/lib/server-data";
+import { deleteManagedBlobs, isManagedBlobUrl } from "@/lib/blob-storage";
+import { getDatabase } from "@/lib/server-data";
 import { whatsappUrl } from "@/lib/whatsapp";
 
 export const dynamic = "force-dynamic";
+
+const uploadedFileSchema = z.object({
+  url: z.string().url().max(700).refine(isManagedBlobUrl, "Arquivo inválido"),
+  filename: z.string().trim().min(1).max(180),
+  contentType: z.enum(["image/jpeg", "image/png", "image/webp"]),
+  size: z.number().int().positive().max(5 * 1024 * 1024),
+});
 
 const quoteSchema = z.object({
   name: z.string().trim().min(2).max(100),
@@ -17,54 +25,28 @@ const quoteSchema = z.object({
   budget: z.string().trim().max(100),
   timeline: z.string().trim().min(2).max(100),
   notes: z.string().trim().max(2000),
+  files: z.array(uploadedFileSchema).max(3).default([]),
 });
 
-function parseJsonArray(value: FormDataEntryValue | null) {
-  if (typeof value !== "string") return [];
-  try {
-    const parsed = JSON.parse(value);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
 export async function POST(request: Request) {
+  let cleanupUrls: string[] = [];
   try {
-    const form = await request.formData();
-    const parsed = quoteSchema.safeParse({
-      name: form.get("name") ?? "",
-      phone: form.get("phone") ?? "",
-      email: form.get("email") ?? "",
-      city: form.get("city") ?? "Goiânia",
-      projectType: form.get("projectType") ?? "",
-      categories: parseJsonArray(form.get("categories")),
-      selectedProducts: parseJsonArray(form.get("selectedProducts")),
-      dimensions: form.get("dimensions") ?? "",
-      budget: form.get("budget") ?? "",
-      timeline: form.get("timeline") ?? "",
-      notes: form.get("notes") ?? "",
-    });
+    const parsed = quoteSchema.safeParse(await request.json());
     if (!parsed.success) {
       return NextResponse.json({ error: "Revise os campos obrigatórios." }, { status: 400 });
     }
 
-    const images = form.getAll("files").filter((entry): entry is File => entry instanceof File && entry.size > 0);
-    if (images.length > 3 || images.some((file) => !["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 5 * 1024 * 1024)) {
-      return NextResponse.json({ error: "Envie até 3 imagens JPG, PNG ou WebP com no máximo 5 MB." }, { status: 400 });
-    }
-
     const quote = parsed.data;
+    cleanupUrls = quote.files.map((file) => file.url);
     const quoteId = crypto.randomUUID();
     const db = await getDatabase();
-    await db
-      .prepare(
+    await db.batch([
+      db.prepare(
         `INSERT INTO quote_requests
          (id, name, phone, email, city, project_type, categories_json,
           selected_products_json, dimensions, budget, timeline, notes, status)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'novo')`,
-      )
-      .bind(
+      ).bind(
         quoteId,
         quote.name,
         quote.phone,
@@ -77,24 +59,15 @@ export async function POST(request: Request) {
         quote.budget,
         quote.timeline,
         quote.notes,
-      )
-      .run();
-
-    if (images.length) {
-      const bucket = await getBucket();
-      for (const [index, file] of images.entries()) {
-        const safeExtension = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
-        const key = `quotes/${quoteId}/${index + 1}-${crypto.randomUUID()}.${safeExtension}`;
-        await bucket.put(key, await file.arrayBuffer(), { httpMetadata: { contentType: file.type } });
-        await db
-          .prepare(
-            `INSERT INTO quote_files (id, quote_id, object_key, filename, content_type, size)
-             VALUES (?, ?, ?, ?, ?, ?)`,
-          )
-          .bind(crypto.randomUUID(), quoteId, key, file.name.slice(0, 180), file.type, file.size)
-          .run();
-      }
-    }
+      ),
+      ...quote.files.map((file) =>
+        db.prepare(
+          `INSERT INTO quote_files (id, quote_id, object_key, filename, content_type, size)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+        ).bind(crypto.randomUUID(), quoteId, file.url, file.filename, file.contentType, file.size),
+      ),
+    ]);
+    cleanupUrls = [];
 
     const projectLabel = quote.projectType === "produto" ? "Produto" : quote.projectType === "planejado" ? "Móvel planejado" : "Ambiente completo";
     const message = [
@@ -109,11 +82,18 @@ export async function POST(request: Request) {
       quote.budget ? `Faixa de investimento: ${quote.budget}` : "",
       `Prazo: ${quote.timeline}`,
       quote.notes ? `Observações: ${quote.notes}` : "",
-      images.length ? `${images.length} imagem(ns) de referência foram anexadas ao pedido.` : "",
+      quote.files.length ? `${quote.files.length} imagem(ns) de referência foram anexadas ao pedido.` : "",
     ].filter(Boolean).join("\n");
 
     return NextResponse.json({ id: quoteId, whatsappUrl: whatsappUrl(message) });
   } catch (error) {
+    if (cleanupUrls.length) {
+      try {
+        await deleteManagedBlobs(cleanupUrls);
+      } catch (cleanupError) {
+        console.error("Falha ao remover anexos órfãos", cleanupError);
+      }
+    }
     console.error("Falha ao registrar orçamento", error);
     return NextResponse.json({ error: "Não foi possível registrar o pedido neste momento." }, { status: 500 });
   }

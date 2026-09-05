@@ -30,9 +30,6 @@ export const metadata: Metadata = {
     icon: "/brand/monograma.svg",
     shortcut: "/brand/monograma.svg",
   },
-  other: {
-    "codex-preview": "development",
-  },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
