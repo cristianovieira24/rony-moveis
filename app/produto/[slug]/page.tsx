@@ -7,6 +7,11 @@ import { SITE_URL } from "@/lib/catalog";
 
 export const revalidate = 3600;
 
+export async function generateStaticParams() {
+  const snapshot = await getPublicSnapshot();
+  return snapshot.products.map((product) => ({ slug: product.slug }));
+}
+
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
   const snapshot = await getPublicSnapshot();

@@ -9,6 +9,11 @@ import { whatsappUrl } from "@/lib/whatsapp";
 
 export const revalidate = 3600;
 
+export async function generateStaticParams() {
+  const snapshot = await getPublicSnapshot();
+  return snapshot.categories.map((category) => ({ slug: category.slug }));
+}
+
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
   const snapshot = await getPublicSnapshot();
