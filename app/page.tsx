@@ -125,7 +125,7 @@ export default async function Home() {
 
       <section className="planned-story" id="planejados">
         <div className="planned-image-main" data-reveal>
-          <img src="/images/spaces/cozinha-cobre.webp" alt="Cozinha planejada em acabamento cobre" loading="lazy" />
+          <img src="/images/rony-originals/carrossel-real-08.webp" alt="Cozinha com móveis planejados" loading="lazy" decoding="async" />
           <span className="image-caption">Projeto pensado para o espaço real</span>
         </div>
         <div className="planned-copy" data-reveal>
@@ -142,7 +142,7 @@ export default async function Home() {
           <Link className="button button-light" href="/orcamento">Começar meu projeto <ArrowRight size={18} /></Link>
         </div>
         <div className="planned-image-detail" data-reveal>
-          <img src="/images/spaces/marcenaria-nogueira.webp" alt="Detalhe de marcenaria em nogueira" loading="lazy" />
+          <img src="/images/rony-originals/carrossel-real-06.webp" alt="Ambiente de trabalho mobiliado" loading="lazy" decoding="async" />
         </div>
       </section>
 

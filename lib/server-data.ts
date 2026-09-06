@@ -144,7 +144,7 @@ async function prepareSeedData() {
     .prepare("SELECT value FROM site_settings WHERE key = ?")
     .bind("seed_version")
     .first<{ value: string }>();
-  if (marker?.value === "3") return;
+  if (marker?.value === "4") return;
 
   const statements: Statement[] = [];
   for (const category of seedCategories) {
@@ -180,17 +180,42 @@ async function prepareSeedData() {
   }
 
   const categoryImageMigrations = [
-    ["cat-presidente", "/images/spaces/cadeiras-escritorio.webp", "/images/legacy-chairs/presidente-01.webp"],
-    ["cat-executiva", "/images/spaces/mesa-escritorio.webp", "/images/legacy-chairs/executiva-01.webp"],
-    ["cat-diretor", "/images/spaces/escritorio-planejado.webp", "/images/legacy-chairs/diretor-01.webp"],
-    ["cat-secretaria", "/images/spaces/cadeiras-escritorio.webp", "/images/legacy-chairs/secretaria-01.webp"],
+    ["cat-cadeiras", "/images/spaces/cadeiras-escritorio.webp", "/images/rony-originals/carrossel-real-02.webp", "contain"],
+    ["cat-escritorio", "/images/spaces/mesa-escritorio.webp", "/images/rony-originals/carrossel-real-07.webp", "cover"],
+    ["cat-planejados", "/images/spaces/cozinha-madeira.webp", "/images/rony-originals/carrossel-real-08.webp", "cover"],
+    ["cat-estofados", "/images/products/atlanta.webp", "/images/products/louisiana.webp", "contain"],
+    ["cat-aco", "/images/spaces/loja-rony.webp", "/images/rony-originals/home-produto-03.webp", "contain"],
+    ["cat-presidente", "/images/spaces/cadeiras-escritorio.webp", "/images/legacy-chairs/presidente-01.webp", "contain"],
+    ["cat-executiva", "/images/spaces/mesa-escritorio.webp", "/images/legacy-chairs/executiva-01.webp", "contain"],
+    ["cat-diretor", "/images/spaces/escritorio-planejado.webp", "/images/legacy-chairs/diretor-01.webp", "contain"],
+    ["cat-secretaria", "/images/spaces/cadeiras-escritorio.webp", "/images/legacy-chairs/secretaria-01.webp", "contain"],
+    ["cat-gamer", "/images/spaces/cadeiras-escritorio.webp", "/images/rony-originals/carrossel-real-04.webp", "contain"],
+    ["cat-banquetas", "/images/spaces/cozinha-cobre.webp", "/images/rony-originals/carrossel-real-08.webp", "cover"],
   ] as const;
-  for (const [id, previousImage, nextImage] of categoryImageMigrations) {
+  for (const [id, previousImage, nextImage, imageFit] of categoryImageMigrations) {
     statements.push(
-      db.prepare("UPDATE categories SET image_url = ?, image_fit = 'contain', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND image_url = ?")
-        .bind(nextImage, id, previousImage),
+      db.prepare("UPDATE categories SET image_url = ?, image_fit = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND image_url = ?")
+        .bind(nextImage, imageFit, id, previousImage),
     );
   }
+
+  const productImageMigrations = [
+    ["prod-cadeiras-escritorio", "/images/spaces/cadeiras-escritorio.webp", "/images/rony-originals/carrossel-real-02.webp"],
+    ["prod-cadeiras-escritorio", "/images/spaces/mesa-escritorio.webp", "/images/rony-originals/carrossel-real-01.webp"],
+    ["prod-home-office", "/images/spaces/escritorio-planejado.webp", "/images/rony-originals/carrossel-real-07.webp"],
+    ["prod-home-office", "/images/spaces/marcenaria-nogueira.webp", "/images/rony-originals/carrossel-real-06.webp"],
+    ["prod-cozinha-cobre", "/images/spaces/cozinha-cobre.webp", "/images/rony-originals/carrossel-real-08.webp"],
+  ] as const;
+  for (const [productId, previousImage, nextImage] of productImageMigrations) {
+    statements.push(
+      db.prepare("UPDATE product_images SET source_url = ? WHERE product_id = ? AND source_url = ?")
+        .bind(nextImage, productId, previousImage),
+    );
+  }
+  statements.push(
+    db.prepare("DELETE FROM product_images WHERE product_id = ? AND source_url = ?")
+      .bind("prod-cozinha-cobre", "/images/spaces/cozinha-madeira.webp"),
+  );
 
   for (const product of seedProducts) {
     statements.push(
@@ -283,13 +308,17 @@ async function prepareSeedData() {
       ),
   );
   statements.push(
+    db.prepare("UPDATE campaigns SET image_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND image_url = ?")
+      .bind("/images/rony-originals/carrossel-real-05.webp", seedCampaign.id, "/images/spaces/escritorio-planejado.webp"),
+  );
+  statements.push(
     db
       .prepare(
         `INSERT INTO site_settings (key, value, updated_at)
          VALUES (?, ?, CURRENT_TIMESTAMP)
          ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP`,
       )
-      .bind("seed_version", "3"),
+      .bind("seed_version", "4"),
   );
 
   await db.batch(statements);

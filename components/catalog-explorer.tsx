@@ -60,7 +60,7 @@ export function CatalogExplorer({ products, categories }: { products: Product[];
             const meta = CATEGORY_META_BY_SLUG[item.slug];
             return (
               <Link href={`/categoria/${item.slug}`} key={item.id}>
-                <span className="catalog-directory-image"><img src={meta?.image ?? "/images/spaces/loja-rony.webp"} alt="" /></span>
+                <span className={`catalog-directory-image is-${item.imageFit}`}><img src={item.imageUrl || meta?.image || "/images/spaces/loja-rony.webp"} alt="" loading="lazy" decoding="async" /></span>
                 <span className="catalog-directory-copy">
                   <strong>{meta?.shortName ?? item.name}</strong>
                   <small>{categoryCounts[item.slug] ? `${categoryCounts[item.slug]} ${categoryCounts[item.slug] === 1 ? "item" : "itens"}` : "Consulte opções"}</small>
@@ -81,7 +81,7 @@ export function CatalogExplorer({ products, categories }: { products: Product[];
         <div className="catalog-filter-row">
           <button className={category === "todos" ? "is-active" : ""} onClick={() => setCategory("todos")}>Todos</button>
           {categories.map((item) => (
-            <button className={category === item.slug ? "is-active" : ""} onClick={() => setCategory(item.slug)} key={item.id}>{item.parentId ? `↳ ${item.name}` : item.name}</button>
+            <button className={category === item.slug ? "is-active" : ""} onClick={() => setCategory(item.slug)} key={item.id}>{item.name}</button>
           ))}
         </div>
         <button className={`offer-filter ${onlyOffers ? "is-active" : ""}`} onClick={() => setOnlyOffers((value) => !value)}>
