@@ -65,6 +65,9 @@
   --graphite-soft: #363731;
   --sage: #727765;
   --sage-dark: #485044;
+  --ink: var(--graphite);
+  --muted: rgba(37, 38, 34, .62);
+  --wood: var(--walnut-light);
   --line: rgba(37, 38, 34, 0.15);
   --line-light: rgba(243, 235, 221, 0.18);
   --font-sans: "Open Sans", Arial, Helvetica, sans-serif;
@@ -526,6 +529,7 @@ img {
 }
 
 .selection-trigger {
+  position: relative;
   padding: 0 10px 0 14px;
   background: transparent;
 }
@@ -895,7 +899,7 @@ img {
 
 .hero-card-bottom {
   right: 30px;
-  bottom: 30px;
+  bottom: 94px;
   width: min(330px, calc(100% - 60px));
   min-height: 142px;
   align-items: stretch;
@@ -1937,28 +1941,32 @@ img {
   z-index: 1;
   right: 28px;
   bottom: 28px;
-  display: grid;
-  width: 112px;
-  height: 112px;
-  align-content: center;
-  justify-items: center;
+  display: flex;
+  min-width: 166px;
+  min-height: 76px;
+  align-items: center;
+  padding: 14px 18px;
   border: 1px solid rgba(255, 255, 255, .55);
-  border-radius: 50%;
+  border-radius: 14px;
   background: rgba(25, 24, 21, .52);
   color: white;
+  gap: 12px;
   backdrop-filter: blur(12px);
 }
 
 .category-page-image > div span {
+  flex: 0 0 auto;
   font-family: var(--font-display);
   font-size: 32px;
   line-height: 1;
 }
 
 .category-page-image > div small {
-  margin-top: 6px;
-  font-size: 11px;
+  max-width: 82px;
+  font-size: 10px;
   letter-spacing: .08em;
+  line-height: 1.3;
+  text-align: left;
   text-transform: uppercase;
 }
 
@@ -4227,8 +4235,8 @@ img {
 
   .selection-trigger b {
     position: absolute;
-    top: 12px;
-    right: 55px;
+    top: -3px;
+    right: -3px;
     width: 16px;
     height: 16px;
     background: var(--walnut);
@@ -4301,10 +4309,6 @@ img {
   .category-page-image,
   .category-page-image > img {
     min-height: 68vw;
-  }
-
-  .selection-trigger b {
-    right: 55px;
   }
 
   .hero {
@@ -4533,7 +4537,7 @@ img {
 
   .hero-card-bottom {
     right: 15px;
-    bottom: 15px;
+    bottom: 78px;
     width: calc(100% - 82px);
   }
 
@@ -4731,8 +4735,20 @@ img {
   .category-page-image > div {
     right: 18px;
     bottom: 18px;
-    width: 96px;
-    height: 96px;
+    min-width: 148px;
+    min-height: 66px;
+    padding: 11px 14px;
+    border-radius: 12px;
+    gap: 10px;
+  }
+
+  .category-page-image > div span {
+    font-size: 27px;
+  }
+
+  .category-page-image > div small {
+    max-width: 76px;
+    font-size: 9px;
   }
 
   .category-products,
@@ -4993,6 +5009,12 @@ img {
   transform: translateY(-3px);
 }
 
+body:has(.product-page) .floating-whatsapp,
+body:has(.quote-page) .floating-whatsapp,
+body:has(.contact-page) .floating-whatsapp {
+  display: none;
+}
+
 .product-card-meta {
   display: flex;
   min-width: 0;
@@ -5223,9 +5245,14 @@ img {
 .contact-grid span { display: flex; flex-direction: column; gap: 8px; color: rgba(37, 38, 34, .48); font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
 .contact-grid strong { color: var(--graphite); font-family: var(--font-display); font-size: clamp(18px, 2vw, 26px); font-weight: 500; letter-spacing: -.025em; line-height: 1.2; text-transform: none; }
 
-@media (max-width: 1320px) {
+@media (max-width: 1440px) {
   .header-search { display: none; }
   .header-search-compact { display: grid; }
+  .floating-whatsapp { width: 52px; justify-content: center; padding: 0; }
+  .floating-whatsapp span { display: none; }
+}
+
+@media (max-width: 1320px) {
   .admin-stats { grid-template-columns: repeat(2, 1fr); }
 }
 
