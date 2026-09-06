@@ -3,16 +3,17 @@
 import Link from "next/link";
 import { ArrowLeft, ArrowRight, Check, MessageCircle, Plus, ShieldCheck } from "lucide-react";
 import { useState } from "react";
-import { formatPrice } from "@/lib/catalog";
+import { AVAILABILITY_LABELS, formatPrice, productPriceText } from "@/lib/catalog";
 import type { Product } from "@/lib/types";
 import { productWhatsAppMessage, whatsappUrl } from "@/lib/whatsapp";
 import { useSelection } from "./selection-provider";
+import { useSiteConfig } from "./site-config-provider";
 
 export function ProductDetail({ product }: { product: Product }) {
   const [activeImage, setActiveImage] = useState(0);
   const { add, has } = useSelection();
+  const settings = useSiteConfig();
   const selected = has(product.id);
-  const price = formatPrice(product.priceCents);
   const oldPrice = formatPrice(product.oldPriceCents);
 
   return (
@@ -39,19 +40,20 @@ export function ProductDetail({ product }: { product: Product }) {
 
       <div className="product-detail-copy">
         <div className="product-breadcrumb"><span>{product.categoryName}</span><span>/</span><span>{product.eyebrow}</span></div>
+        <span className={`availability-tag availability-detail is-${product.availability}`}>{AVAILABILITY_LABELS[product.availability]}</span>
         <h1>{product.name}</h1>
         <p className="product-lead">{product.shortDescription}</p>
         <div className="product-detail-price">
           {oldPrice && <div><span>De</span><del>{oldPrice}</del></div>}
-          <strong>{price ?? product.priceLabel ?? "Valor sob consulta"}</strong>
-          {price && <small>Consulte disponibilidade e condições.</small>}
+          <strong>{productPriceText(product)}</strong>
+          {product.priceCents && <small>Consulte disponibilidade e condições.</small>}
         </div>
         <p className="product-description">{product.description}</p>
         <ul className="feature-list">
           {product.features.map((feature) => <li key={feature}><Check size={17} /> {feature}</li>)}
         </ul>
         <div className="product-actions">
-          <a className="button button-whatsapp button-full" href={whatsappUrl(productWhatsAppMessage(product))} target="_blank" rel="noreferrer">
+          <a className="button button-whatsapp button-full" href={whatsappUrl(productWhatsAppMessage(product), settings.whatsappNumber)} target="_blank" rel="noreferrer">
             <MessageCircle size={19} /> Tenho interesse <ArrowRight size={17} />
           </a>
           <button
@@ -66,4 +68,3 @@ export function ProductDetail({ product }: { product: Product }) {
     </section>
   );
 }
-

@@ -1,23 +1,27 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, ArrowUpRight, ChevronDown, Menu, MessageCircle, ShoppingBag, X } from "lucide-react";
+import { ArrowRight, ArrowUpRight, ChevronDown, Menu, MessageCircle, Search, ShoppingBag, X } from "lucide-react";
 import { useState } from "react";
-import { CATEGORY_META } from "@/lib/category-meta";
-import { STORE_ADDRESS, STORE_PHONE } from "@/lib/catalog";
+import { CATEGORY_META_BY_SLUG } from "@/lib/category-meta";
+import type { Category } from "@/lib/types";
 import { whatsappUrl } from "@/lib/whatsapp";
 import { useSelection } from "./selection-provider";
+import { useSiteConfig } from "./site-config-provider";
 
 const nav = [
   { href: "/#planejados", label: "Planejados" },
   { href: "/orcamento", label: "Orçamento" },
   { href: "/#loja", label: "A loja" },
+  { href: "/contato", label: "Contato" },
 ];
 
-export function SiteHeader() {
+export function SiteHeader({ categories }: { categories: Category[] }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [categoriesOpen, setCategoriesOpen] = useState(false);
   const { total, open } = useSelection();
+  const settings = useSiteConfig();
+  const mainCategories = categories.filter((category) => category.parentId === null && category.featured);
 
   return (
     <>
@@ -44,10 +48,10 @@ export function SiteHeader() {
                     <Link href="/catalogo" onClick={() => setCategoriesOpen(false)}>Ver todos os produtos <ArrowRight size={15} /></Link>
                   </div>
                   <div className="category-mega-grid">
-                    {CATEGORY_META.map((category) => (
+                    {mainCategories.map((category) => (
                       <Link href={`/categoria/${category.slug}`} key={category.slug} onClick={() => setCategoriesOpen(false)}>
-                        <img src={category.image} alt="" />
-                        <span><small>{category.kicker}</small><strong>{category.shortName}</strong></span>
+                        <img src={category.imageUrl || CATEGORY_META_BY_SLUG[category.slug]?.image || "/images/spaces/loja-rony.webp"} alt="" />
+                        <span><small>{categories.some((item) => item.parentId === category.id) ? `${categories.filter((item) => item.parentId === category.id).length} linhas` : "Explore a categoria"}</small><strong>{category.name}</strong></span>
                         <ArrowUpRight size={16} />
                       </Link>
                     ))}
@@ -60,12 +64,19 @@ export function SiteHeader() {
             ))}
           </nav>
           <div className="header-actions">
+            <form className="header-search" action="/catalogo" role="search">
+              <Search size={17} />
+              <input name="q" placeholder="Buscar produtos" aria-label="Buscar produtos" />
+            </form>
+            <Link className="header-search-compact" href="/catalogo" aria-label="Buscar produtos">
+              <Search size={18} />
+            </Link>
             <button className="selection-trigger" onClick={open} aria-label={`Abrir seleção com ${total} itens`}>
               <ShoppingBag size={18} strokeWidth={1.7} />
               <span>Seleção</span>
               <b>{total}</b>
             </button>
-            <a className="header-whatsapp" href={whatsappUrl("Olá, Rony Móveis! Gostaria de atendimento.")} target="_blank" rel="noreferrer">
+            <a className="header-whatsapp" href={whatsappUrl("Olá, Rony Móveis! Gostaria de atendimento.", settings.whatsappNumber)} target="_blank" rel="noreferrer">
               <MessageCircle size={18} strokeWidth={1.7} />
               <span>Falar agora</span>
             </a>
@@ -76,6 +87,7 @@ export function SiteHeader() {
         </div>
       </header>
       <div className={`mobile-menu ${menuOpen ? "is-open" : ""}`}>
+        <form className="mobile-search" action="/catalogo" role="search"><Search size={18} /><input name="q" placeholder="O que você procura?" aria-label="Buscar produtos" /><button type="submit">Buscar</button></form>
         <nav aria-label="Navegação móvel">
           <Link href="/catalogo" onClick={() => setMenuOpen(false)}>
             <span>01</span>Todos os produtos<ArrowUpRight size={20} />
@@ -89,48 +101,47 @@ export function SiteHeader() {
         <div className="mobile-categories">
           <span>Comprar por categoria</span>
           <div>
-            {CATEGORY_META.map((category) => (
+            {mainCategories.map((category) => (
               <Link href={`/categoria/${category.slug}`} key={category.slug} onClick={() => setMenuOpen(false)}>
-                {category.shortName}<ArrowRight size={14} />
+                {category.name}<ArrowRight size={14} />
               </Link>
             ))}
           </div>
         </div>
-        <a href={whatsappUrl("Olá, Rony Móveis! Gostaria de atendimento.")} target="_blank" rel="noreferrer">
-          WhatsApp {STORE_PHONE}
+        <a href={whatsappUrl("Olá, Rony Móveis! Gostaria de atendimento.", settings.whatsappNumber)} target="_blank" rel="noreferrer">
+          WhatsApp {settings.phone}
         </a>
       </div>
     </>
   );
 }
 
-export function SiteFooter() {
+export function SiteFooter({ categories }: { categories: Category[] }) {
+  const settings = useSiteConfig();
+  const mainCategories = categories.filter((category) => category.parentId === null && category.active);
   return (
     <footer className="site-footer">
       <div className="footer-main">
         <div className="footer-brand">
           <img src="/brand/logo-horizontal-clara.svg" alt="Rony Móveis" />
-          <p>Móveis para casa e escritório, planejados, cadeiras e estofados em Goiânia.</p>
+          <p>{settings.tagline} Atendimento em Goiânia.</p>
         </div>
         <div>
           <span className="footer-label">Categorias</span>
-          <Link href="/categoria/cadeiras">Cadeiras</Link>
-          <Link href="/categoria/poltronas">Poltronas</Link>
-          <Link href="/categoria/escritorio">Móveis para escritório</Link>
+          {mainCategories.slice(0, 3).map((category) => <Link href={`/categoria/${category.slug}`} key={category.id}>{category.name}</Link>)}
         </div>
         <div>
           <span className="footer-label">Mais opções</span>
-          <Link href="/categoria/planejados">Planejados</Link>
-          <Link href="/categoria/estofados">Estofados</Link>
-          <Link href="/categoria/moveis-de-aco">Móveis de aço</Link>
+          {mainCategories.slice(3, 6).map((category) => <Link href={`/categoria/${category.slug}`} key={category.id}>{category.name}</Link>)}
         </div>
         <div>
           <span className="footer-label">Converse</span>
-          <a href={whatsappUrl("Olá, Rony Móveis! Gostaria de atendimento.")} target="_blank" rel="noreferrer">{STORE_PHONE}</a>
-          <a href="mailto:ronymoveis12@gmail.com">ronymoveis12@gmail.com</a>
-          <p>{STORE_ADDRESS}</p>
-          <a href="https://maps.app.goo.gl/5Nz2rNHnaPNy8KGv9" target="_blank" rel="noreferrer">Abrir no mapa <ArrowUpRight size={14} /></a>
-          <a href="https://www.instagram.com/ronymoveisgoiania/" target="_blank" rel="noreferrer">Instagram <ArrowUpRight size={14} /></a>
+          <a href={whatsappUrl("Olá, Rony Móveis! Gostaria de atendimento.", settings.whatsappNumber)} target="_blank" rel="noreferrer">{settings.phone}</a>
+          <a href={`mailto:${settings.email}`}>{settings.email}</a>
+          <p>{settings.address}</p>
+          <a href={settings.mapUrl} target="_blank" rel="noreferrer">Abrir no mapa <ArrowUpRight size={14} /></a>
+          <a href={settings.instagramUrl} target="_blank" rel="noreferrer">Instagram <ArrowUpRight size={14} /></a>
+          <small>{settings.openingHours}</small>
         </div>
       </div>
       <div className="footer-bottom">

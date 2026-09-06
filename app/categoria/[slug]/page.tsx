@@ -4,7 +4,6 @@ import { ArrowLeft, ArrowRight, ArrowUpRight, MessageCircle } from "lucide-react
 import { notFound } from "next/navigation";
 import { ProductCard } from "@/components/product-card";
 import { CATEGORY_META_BY_SLUG } from "@/lib/category-meta";
-import { seedCategories } from "@/lib/catalog";
 import { getPublicSnapshot } from "@/lib/server-data";
 import { whatsappUrl } from "@/lib/whatsapp";
 
@@ -12,7 +11,8 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
-  const category = seedCategories.find((item) => item.slug === slug);
+  const snapshot = await getPublicSnapshot();
+  const category = snapshot.categories.find((item) => item.slug === slug);
   if (!category) return {};
   return {
     title: category.name,
@@ -27,8 +27,10 @@ export default async function CategoryPage({ params }: { params: Promise<{ slug:
   if (!category) notFound();
 
   const meta = CATEGORY_META_BY_SLUG[slug];
-  const products = snapshot.products.filter((product) => product.categorySlug === slug);
-  const otherCategories = snapshot.categories.filter((item) => item.slug !== slug);
+  const children = snapshot.categories.filter((item) => item.parentId === category.id);
+  const categoryIds = new Set([category.id, ...children.map((item) => item.id)]);
+  const products = snapshot.products.filter((product) => categoryIds.has(product.categoryId));
+  const otherCategories = snapshot.categories.filter((item) => item.slug !== slug && item.parentId === null);
   const message = `Olá, Rony Móveis! Gostaria de conhecer as opções de ${category.name.toLocaleLowerCase("pt-BR")}.`;
 
   return (
@@ -44,12 +46,13 @@ export default async function CategoryPage({ params }: { params: Promise<{ slug:
               {meta.examples.map((example) => <span key={example}>{example}</span>)}
             </div>
           ) : null}
-          <a className="button button-primary" href={whatsappUrl(message)} target="_blank" rel="noreferrer">
+          {children.length > 0 && <div className="category-subnav" aria-label="Subcategorias">{children.map((child) => <Link href={`/categoria/${child.slug}`} key={child.id}>{child.name}<ArrowUpRight size={13} /></Link>)}</div>}
+          <a className="button button-primary" href={whatsappUrl(message, snapshot.settings.whatsappNumber)} target="_blank" rel="noreferrer">
             Consultar esta categoria <MessageCircle size={18} />
           </a>
         </div>
         <div className="category-page-image">
-          <img src={meta?.heroImage ?? meta?.image ?? "/images/spaces/loja-rony.webp"} alt={category.name} />
+          <img src={category.imageUrl || meta?.heroImage || meta?.image || "/images/spaces/loja-rony.webp"} alt={category.name} />
           <div>
             <span>{products.length ? String(products.length).padStart(2, "0") : "Loja"}</span>
             <small>{products.length ? (products.length === 1 ? "item no catálogo" : "itens no catálogo") : "consulte opções"}</small>
@@ -77,7 +80,7 @@ export default async function CategoryPage({ params }: { params: Promise<{ slug:
               <h2>Nem tudo o que temos na loja já está aqui.</h2>
               <p>Fale com a equipe e diga o que procura. Enviamos fotos, medidas, acabamentos e valores disponíveis pelo WhatsApp.</p>
             </div>
-            <a className="button button-whatsapp" href={whatsappUrl(message)} target="_blank" rel="noreferrer">
+            <a className="button button-whatsapp" href={whatsappUrl(message, snapshot.settings.whatsappNumber)} target="_blank" rel="noreferrer">
               Ver opções no WhatsApp <ArrowUpRight size={18} />
             </a>
           </div>
@@ -94,7 +97,7 @@ export default async function CategoryPage({ params }: { params: Promise<{ slug:
             const itemMeta = CATEGORY_META_BY_SLUG[item.slug];
             return (
               <Link href={`/categoria/${item.slug}`} key={item.id} data-reveal style={{ "--delay": `${index * 50}ms` } as React.CSSProperties}>
-                <img src={itemMeta?.image ?? "/images/spaces/loja-rony.webp"} alt="" loading="lazy" />
+                <img src={item.imageUrl || itemMeta?.image || "/images/spaces/loja-rony.webp"} alt="" loading="lazy" />
                 <div><span>{itemMeta?.kicker}</span><strong>{item.name}</strong></div>
                 <ArrowUpRight size={18} />
               </Link>

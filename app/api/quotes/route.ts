@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { deleteManagedBlobs, isManagedBlobUrl } from "@/lib/blob-storage";
-import { getDatabase } from "@/lib/server-data";
+import { getDatabase, getSiteSettings } from "@/lib/server-data";
 import { whatsappUrl } from "@/lib/whatsapp";
+import { clientIp, consumeRateLimit, isSameOriginMutation } from "@/lib/security";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +32,9 @@ const quoteSchema = z.object({
 export async function POST(request: Request) {
   let cleanupUrls: string[] = [];
   try {
+    if (!isSameOriginMutation(request)) return NextResponse.json({ error: "Origem inválida." }, { status: 403 });
+    const rate = consumeRateLimit(`quote:${clientIp(request)}`, 8, 60 * 60 * 1000);
+    if (!rate.allowed) return NextResponse.json({ error: "Muitos pedidos enviados. Aguarde um pouco e tente novamente." }, { status: 429, headers: { "Retry-After": String(rate.retryAfter) } });
     const parsed = quoteSchema.safeParse(await request.json());
     if (!parsed.success) {
       return NextResponse.json({ error: "Revise os campos obrigatórios." }, { status: 400 });
@@ -85,7 +89,8 @@ export async function POST(request: Request) {
       quote.files.length ? `${quote.files.length} imagem(ns) de referência foram anexadas ao pedido.` : "",
     ].filter(Boolean).join("\n");
 
-    return NextResponse.json({ id: quoteId, whatsappUrl: whatsappUrl(message) });
+    const settings = await getSiteSettings();
+    return NextResponse.json({ id: quoteId, whatsappUrl: whatsappUrl(message, settings.whatsappNumber) });
   } catch (error) {
     if (cleanupUrls.length) {
       try {

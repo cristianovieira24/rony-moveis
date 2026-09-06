@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { Check, ChevronRight, Minus, Plus, ShoppingBag, Trash2, X } from "lucide-react";
 import { SITE_URL } from "@/lib/catalog";
 import { whatsappUrl } from "@/lib/whatsapp";
+import { useSiteConfig } from "./site-config-provider";
 
 export type SelectionItem = {
   id: string;
@@ -106,6 +107,7 @@ export function useSelection() {
 
 function SelectionDrawer() {
   const { items, total, isOpen, close, remove, setQuantity } = useSelection();
+  const settings = useSiteConfig();
   const message = [
     "Olá, Rony Móveis! Montei uma seleção no site e gostaria de atendimento:",
     "",
@@ -163,7 +165,7 @@ function SelectionDrawer() {
             </div>
             <div className="selection-foot">
               <p><Check size={16} /> {total} {total === 1 ? "item selecionado" : "itens selecionados"}</p>
-              <a className="button button-whatsapp button-full" href={whatsappUrl(message)} target="_blank" rel="noreferrer">
+              <a className="button button-whatsapp button-full" href={whatsappUrl(message, settings.whatsappNumber)} target="_blank" rel="noreferrer">
                 Pedir atendimento no WhatsApp <ChevronRight size={18} />
               </a>
               <small>Nenhuma compra é feita pelo site. Nossa equipe confirma tudo com você.</small>

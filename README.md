@@ -6,9 +6,22 @@ Site institucional e catálogo administrável da Rony Móveis, em Goiânia. O pr
 
 - Next.js 16 e React 19
 - Vercel para hospedagem e deploy contínuo pelo GitHub
-- Neon Postgres para produtos, campanhas e solicitações de orçamento
+- Neon Postgres para produtos, categorias, configurações, campanhas e solicitações de orçamento
 - Vercel Blob para fotos do catálogo e referências dos clientes
 - Painel próprio em `/admin`, protegido por sessão assinada
+
+## O que pode ser atualizado pelo painel
+
+- produtos, fotos, destaques, ordem e visibilidade;
+- preço exato, preço “a partir de”, valor sob consulta ou texto personalizado;
+- disponibilidade, selo de oferta/novidade e termos extras de pesquisa;
+- categorias e subcategorias, com imagem, ordem e atalhos no site;
+- destaque principal da página inicial;
+- WhatsApp, telefone, e-mail, Instagram, endereço, horário e link do mapa;
+- título e descrição usados pelos mecanismos de busca;
+- acompanhamento e resposta dos pedidos de orçamento.
+
+O catálogo público possui pesquisa global, filtros, páginas por categoria, seleção de vários itens para atendimento no WhatsApp e página de contato. Não existe checkout nem pagamento no site.
 
 ## Desenvolvimento
 
@@ -43,3 +56,5 @@ Importe `cristianovieira24/rony-moveis` na Vercel, conecte Neon e Vercel Blob ao
 npm run lint
 npm run build
 ```
+
+As rotas administrativas validam sessão e origem, o login e os formulários públicos possuem limite de tentativas, e a aplicação envia cabeçalhos de segurança e bloqueio de indexação do painel.

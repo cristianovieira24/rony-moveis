@@ -2,11 +2,13 @@ import { NextResponse } from "next/server";
 import { requireAdminApi } from "@/lib/admin-auth";
 import { deleteManagedBlobs, managedBlobKey } from "@/lib/blob-storage";
 import { getDatabase } from "@/lib/server-data";
+import { isSameOriginMutation } from "@/lib/security";
 import { productInputSchema } from "../route";
 
 export const dynamic = "force-dynamic";
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  if (!isSameOriginMutation(request)) return NextResponse.json({ error: "Origem inválida." }, { status: 403 });
   if (!(await requireAdminApi())) return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
   const parsed = productInputSchema.safeParse(await request.json());
   if (!parsed.success) return NextResponse.json({ error: "Revise os dados do produto.", details: parsed.error.flatten() }, { status: 400 });
@@ -21,8 +23,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     db.prepare(
       `UPDATE products SET
        slug = ?, name = ?, eyebrow = ?, short_description = ?, description = ?, category_id = ?,
-       price_cents = ?, old_price_cents = ?, price_label = ?, badge = ?, features_json = ?,
-       active = ?, featured = ?, sort_order = ?, updated_at = CURRENT_TIMESTAMP
+       price_cents = ?, old_price_cents = ?, price_label = ?, price_mode = ?, availability = ?,
+       search_terms = ?, badge = ?, features_json = ?, active = ?, featured = ?, sort_order = ?,
+       updated_at = CURRENT_TIMESTAMP
        WHERE id = ?`,
     ).bind(
       input.slug,
@@ -34,6 +37,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       input.priceCents,
       input.oldPriceCents,
       input.priceLabel || null,
+      input.priceMode,
+      input.availability,
+      input.searchTerms,
       input.badge || null,
       JSON.stringify(input.features),
       input.active ? 1 : 0,
@@ -76,7 +82,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 }
 
-export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  if (!isSameOriginMutation(request)) return NextResponse.json({ error: "Origem inválida." }, { status: 403 });
   if (!(await requireAdminApi())) return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
   const { id } = await params;
   const db = await getDatabase();

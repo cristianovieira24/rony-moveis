@@ -1,44 +1,39 @@
 import type { Metadata } from "next";
 import { SelectionProvider } from "@/components/selection-provider";
 import { SiteFrame } from "@/components/site-frame";
+import { SiteConfigProvider } from "@/components/site-config-provider";
 import { SITE_URL } from "@/lib/catalog";
+import { getSiteChromeData } from "@/lib/server-data";
 import "./globals.css";
 
-export const metadata: Metadata = {
-  metadataBase: new URL(SITE_URL),
-  title: {
-    default: "Rony Móveis | Casa, escritório e planejados em Goiânia",
-    template: "%s | Rony Móveis",
-  },
-  description:
-    "Móveis para casa e escritório, cadeiras, poltronas, estofados e projetos planejados com atendimento em Goiânia.",
-  keywords: [
-    "móveis em Goiânia",
-    "cadeiras de escritório",
-    "móveis planejados",
-    "poltronas",
-    "Rony Móveis",
-  ],
-  openGraph: {
-    title: "Rony Móveis",
-    description: "Móveis para viver e trabalhar melhor, com atendimento próximo em Goiânia.",
-    locale: "pt_BR",
-    type: "website",
-    images: ["/images/spaces/escritorio-planejado.webp"],
-  },
-  icons: {
-    icon: "/brand/monograma.svg",
-    shortcut: "/brand/monograma.svg",
-  },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const { settings } = await getSiteChromeData();
+  return {
+    metadataBase: new URL(SITE_URL),
+    title: { default: settings.seoTitle, template: `%s | ${settings.businessName}` },
+    description: settings.seoDescription,
+    keywords: ["móveis em Goiânia", "cadeiras de escritório", "móveis planejados", "poltronas", "Rony Móveis"],
+    openGraph: {
+      title: settings.businessName,
+      description: settings.seoDescription,
+      locale: "pt_BR",
+      type: "website",
+      images: ["/images/spaces/escritorio-planejado.webp"],
+    },
+    icons: { icon: "/brand/monograma.svg", shortcut: "/brand/monograma.svg" },
+  };
+}
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  const { categories, settings } = await getSiteChromeData();
   return (
     <html lang="pt-BR">
       <body>
-        <SelectionProvider>
-          <SiteFrame>{children}</SiteFrame>
-        </SelectionProvider>
+        <SiteConfigProvider settings={settings}>
+          <SelectionProvider>
+            <SiteFrame categories={categories}>{children}</SiteFrame>
+          </SelectionProvider>
+        </SiteConfigProvider>
       </body>
     </html>
   );

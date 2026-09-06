@@ -27,7 +27,7 @@ export default async function AdminLoginPage({ searchParams }: { searchParams: P
           <form action="/api/admin/login" method="post" className="admin-login-form">
             <label><span>E-mail</span><input name="email" type="email" autoComplete="username" required /></label>
             <label><span>Senha</span><input name="password" type="password" autoComplete="current-password" required /></label>
-            {erro && <p className="form-error">E-mail ou senha incorretos.</p>}
+            {erro && <p className="form-error">{erro === "limite" ? "Muitas tentativas. Aguarde 15 minutos e tente novamente." : "E-mail ou senha incorretos."}</p>}
             <button className="button button-primary" type="submit">Entrar no painel</button>
           </form>
         ) : (

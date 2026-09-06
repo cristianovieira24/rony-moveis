@@ -2,14 +2,13 @@
 
 import Link from "next/link";
 import { ArrowUpRight, Check, Plus } from "lucide-react";
-import { formatPrice } from "@/lib/catalog";
+import { AVAILABILITY_LABELS, formatPrice, productPriceText } from "@/lib/catalog";
 import type { Product } from "@/lib/types";
 import { useSelection } from "./selection-provider";
 
 export function ProductCard({ product, index = 0 }: { product: Product; index?: number }) {
   const { add, has } = useSelection();
   const selected = has(product.id);
-  const price = formatPrice(product.priceCents);
   const oldPrice = formatPrice(product.oldPriceCents);
 
   return (
@@ -20,13 +19,13 @@ export function ProductCard({ product, index = 0 }: { product: Product; index?: 
         <span className="product-view-icon"><ArrowUpRight size={19} strokeWidth={1.6} /></span>
       </Link>
       <div className="product-card-body">
-        <span className="product-category">{product.categoryName}</span>
+        <div className="product-card-meta"><span className="product-category">{product.categoryName}</span><span className={`availability-tag is-${product.availability}`}>{AVAILABILITY_LABELS[product.availability]}</span></div>
         <h3><Link href={`/produto/${product.slug}`}>{product.name}</Link></h3>
         <p>{product.shortDescription}</p>
         <div className="product-card-bottom">
           <div className="product-price">
             {oldPrice && <del>{oldPrice}</del>}
-            <strong>{price ?? product.priceLabel ?? "Consulte"}</strong>
+            <strong>{productPriceText(product)}</strong>
           </div>
           <button
             className={`add-selection ${selected ? "is-selected" : ""}`}

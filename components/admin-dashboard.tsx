@@ -12,27 +12,32 @@ import {
   Eye,
   EyeOff,
   FileImage,
+  FolderTree,
   ImagePlus,
   LayoutDashboard,
   LoaderCircle,
   LogOut,
+  MapPin,
   Menu,
   MessageCircleMore,
   PackagePlus,
   Pencil,
   Plus,
   Search,
+  Settings,
   Star,
+  Store,
   Trash2,
   Upload,
   X,
 } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
-import { formatPrice } from "@/lib/catalog";
-import type { Campaign, Category, Product, QuoteSummary } from "@/lib/types";
+import { productPriceText } from "@/lib/catalog";
+import type { Campaign, Category, Product, QuoteSummary, SiteSettings } from "@/lib/types";
 
-type Tab = "overview" | "products" | "campaign" | "quotes";
+type Tab = "overview" | "products" | "categories" | "campaign" | "quotes" | "settings";
 type ProductDraft = Omit<Product, "categorySlug" | "categoryName">;
+type CategoryDraft = Omit<Category, "parentName">;
 
 const emptyProduct: ProductDraft = {
   id: "",
@@ -45,11 +50,26 @@ const emptyProduct: ProductDraft = {
   priceCents: null,
   oldPriceCents: null,
   priceLabel: null,
+  priceMode: "consult",
+  availability: "available",
+  searchTerms: "",
   badge: null,
   features: [],
   images: [],
   active: true,
   featured: false,
+  sortOrder: 100,
+};
+
+const emptyCategory: CategoryDraft = {
+  id: "",
+  slug: "",
+  name: "",
+  description: "",
+  parentId: null,
+  imageUrl: "",
+  active: true,
+  featured: true,
   sortOrder: 100,
 };
 
@@ -65,6 +85,9 @@ function toDraft(product: Product): ProductDraft {
     priceCents: product.priceCents,
     oldPriceCents: product.oldPriceCents,
     priceLabel: product.priceLabel,
+    priceMode: product.priceMode,
+    availability: product.availability,
+    searchTerms: product.searchTerms,
     badge: product.badge,
     features: [...product.features],
     images: [...product.images],
@@ -106,9 +129,10 @@ function uploadPath(prefix: string, file: File) {
 
 export function AdminDashboard({
   products: initialProducts,
-  categories,
+  categories: initialCategories,
   campaign: initialCampaign,
   quotes: initialQuotes,
+  siteSettings: initialSettings,
   adminName,
   signOutPath,
 }: {
@@ -116,22 +140,27 @@ export function AdminDashboard({
   categories: Category[];
   campaign: Campaign;
   quotes: QuoteSummary[];
+  siteSettings: SiteSettings;
   adminName: string;
   signOutPath: string;
 }) {
   const [tab, setTab] = useState<Tab>("overview");
   const [mobileNav, setMobileNav] = useState(false);
   const [products, setProducts] = useState(initialProducts);
+  const [categories, setCategories] = useState(initialCategories);
   const [quotes, setQuotes] = useState(initialQuotes);
   const [campaign, setCampaign] = useState(initialCampaign);
+  const [siteSettings, setSiteSettings] = useState(initialSettings);
   const [search, setSearch] = useState("");
   const [draft, setDraft] = useState<ProductDraft | null>(null);
+  const [categoryDraft, setCategoryDraft] = useState<CategoryDraft | null>(null);
   const [selectedQuote, setSelectedQuote] = useState<QuoteSummary | null>(null);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [notice, setNotice] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
   const campaignFileRef = useRef<HTMLInputElement>(null);
+  const categoryFileRef = useRef<HTMLInputElement>(null);
 
   const visibleProducts = useMemo(() => {
     const needle = search.trim().toLowerCase();
@@ -145,8 +174,10 @@ export function AdminDashboard({
   const navItems: { id: Tab; label: string; icon: React.ReactNode }[] = [
     { id: "overview", label: "Visão geral", icon: <LayoutDashboard size={18} /> },
     { id: "products", label: "Produtos", icon: <Boxes size={18} /> },
+    { id: "categories", label: "Categorias", icon: <FolderTree size={18} /> },
     { id: "campaign", label: "Destaque do site", icon: <BadgePercent size={18} /> },
     { id: "quotes", label: "Orçamentos", icon: <MessageCircleMore size={18} /> },
+    { id: "settings", label: "Loja e contatos", icon: <Settings size={18} /> },
   ];
 
   const navigate = (next: Tab) => {
@@ -199,6 +230,28 @@ export function AdminDashboard({
     } finally {
       setUploading(false);
       if (campaignFileRef.current) campaignFileRef.current.value = "";
+    }
+  }
+
+  async function uploadCategoryImage(file: File) {
+    if (!categoryDraft) return;
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 8 * 1024 * 1024) {
+      flash("Use JPG, PNG ou WebP com no máximo 8 MB.");
+      return;
+    }
+    setUploading(true);
+    try {
+      const blob = await upload(uploadPath("catalog", file), file, {
+        access: "public",
+        handleUploadUrl: "/api/admin/upload",
+      });
+      setCategoryDraft((current) => current ? { ...current, imageUrl: blob.url } : current);
+      flash("Imagem da categoria enviada.");
+    } catch (error) {
+      flash(error instanceof Error ? error.message : "Não foi possível enviar a imagem.");
+    } finally {
+      setUploading(false);
+      if (categoryFileRef.current) categoryFileRef.current.value = "";
     }
   }
 
@@ -263,6 +316,70 @@ export function AdminDashboard({
     }
   }
 
+  async function saveCategory() {
+    if (!categoryDraft || saving) return;
+    if (!categoryDraft.name.trim() || !categoryDraft.slug.trim()) {
+      flash("Preencha nome e endereço da categoria.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const isNew = !categoryDraft.id;
+      const response = await fetch(isNew ? "/api/admin/categories" : `/api/admin/categories/${categoryDraft.id}`, {
+        method: isNew ? "POST" : "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(categoryDraft),
+      });
+      const data = (await response.json()) as { id?: string; error?: string };
+      if (!response.ok) throw new Error(data.error || "Não foi possível salvar.");
+      const parent = categories.find((item) => item.id === categoryDraft.parentId);
+      const fullCategory: Category = {
+        ...categoryDraft,
+        id: categoryDraft.id || (data.id as string),
+        parentName: parent?.name ?? null,
+      };
+      setCategories((current) => isNew ? [...current, fullCategory] : current.map((item) => item.id === fullCategory.id ? fullCategory : item));
+      setCategoryDraft(null);
+      flash(isNew ? "Categoria criada." : "Categoria atualizada.");
+    } catch (error) {
+      flash(error instanceof Error ? error.message : "Não foi possível salvar.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function deleteCategory(category: Category) {
+    if (!window.confirm(`Remover “${category.name}” do menu? Produtos e subcategorias ligados a ela serão preservados.`)) return;
+    const response = await fetch(`/api/admin/categories/${category.id}`, { method: "DELETE" });
+    const data = (await response.json()) as { hidden?: boolean; error?: string };
+    if (!response.ok) {
+      flash(data.error || "Não foi possível remover a categoria.");
+      return;
+    }
+    setCategories((current) => data.hidden
+      ? current.map((item) => item.id === category.id ? { ...item, active: false } : item)
+      : current.filter((item) => item.id !== category.id));
+    flash(data.hidden ? "Categoria ocultada para preservar os itens ligados a ela." : "Categoria removida.");
+  }
+
+  async function saveSettings() {
+    setSaving(true);
+    try {
+      const response = await fetch("/api/admin/settings", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(siteSettings),
+      });
+      const data = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(data.error || "Não foi possível salvar.");
+      flash("Dados da loja atualizados.");
+    } catch (error) {
+      flash(error instanceof Error ? error.message : "Não foi possível salvar.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function updateQuoteStatus(id: string, status: string) {
     const response = await fetch(`/api/admin/quotes/${id}`, {
       method: "PATCH",
@@ -302,9 +419,10 @@ export function AdminDashboard({
         <div className="admin-content">
           {tab === "overview" && (
             <section className="admin-view">
-              <div className="admin-page-title"><div><span>Visão geral</span><h1>O que está acontecendo no site.</h1></div><button className="admin-primary" onClick={() => { setDraft({ ...emptyProduct, categoryId: categories[0]?.id ?? "" }); setTab("products"); }}><Plus size={17} /> Novo produto</button></div>
+              <div className="admin-page-title"><div><span>Visão geral</span><h1>O que está acontecendo no site.</h1></div><button className="admin-primary" onClick={() => { setDraft({ ...emptyProduct, categoryId: categories.find((item) => item.active)?.id ?? "" }); setTab("products"); }}><Plus size={17} /> Novo produto</button></div>
               <div className="admin-stats">
                 <article><span className="stat-icon"><Boxes size={19} /></span><p>Produtos visíveis</p><strong>{activeProducts}</strong><button onClick={() => navigate("products")}>Gerenciar <ChevronRight size={14} /></button></article>
+                <article><span className="stat-icon"><FolderTree size={19} /></span><p>Categorias visíveis</p><strong>{categories.filter((item) => item.active).length}</strong><button onClick={() => navigate("categories")}>Organizar <ChevronRight size={14} /></button></article>
                 <article><span className="stat-icon"><CircleDollarSign size={19} /></span><p>Ofertas ativas</p><strong>{offers}</strong><button onClick={() => navigate("products")}>Revisar <ChevronRight size={14} /></button></article>
                 <article><span className="stat-icon"><MessageCircleMore size={19} /></span><p>Novos orçamentos</p><strong>{newQuotes}</strong><button onClick={() => navigate("quotes")}>Atender <ChevronRight size={14} /></button></article>
               </div>
@@ -327,7 +445,7 @@ export function AdminDashboard({
 
           {tab === "products" && (
             <section className="admin-view">
-              <div className="admin-page-title"><div><span>Catálogo</span><h1>Produtos e projetos.</h1></div><button className="admin-primary" onClick={() => setDraft({ ...emptyProduct, categoryId: categories[0]?.id ?? "" })}><PackagePlus size={17} /> Adicionar produto</button></div>
+              <div className="admin-page-title"><div><span>Catálogo</span><h1>Produtos e projetos.</h1></div><button className="admin-primary" onClick={() => setDraft({ ...emptyProduct, categoryId: categories.find((item) => item.active)?.id ?? "" })}><PackagePlus size={17} /> Adicionar produto</button></div>
               <div className="admin-toolbar"><label><Search size={17} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar produto…" /></label><span>{visibleProducts.length} itens</span></div>
               <div className="admin-product-table">
                 <div className="admin-table-head"><span>Produto</span><span>Categoria</span><span>Preço</span><span>Status</span><span>Ações</span></div>
@@ -335,9 +453,27 @@ export function AdminDashboard({
                   <article key={product.id}>
                     <div className="admin-product-name"><img src={product.images[0]} alt="" /><p><strong>{product.name}</strong><span>/{product.slug}</span></p></div>
                     <span>{product.categoryName}</span>
-                    <span>{formatPrice(product.priceCents) ?? product.priceLabel ?? "Sob consulta"}</span>
+                    <span>{productPriceText(product)}</span>
                     <span className={`admin-status ${product.active ? "is-active" : ""}`}>{product.active ? <Eye size={14} /> : <EyeOff size={14} />}{product.active ? "Visível" : "Oculto"}{product.featured && <Star size={13} fill="currentColor" />}</span>
                     <div className="admin-row-actions"><button onClick={() => setDraft(toDraft(product))} aria-label={`Editar ${product.name}`}><Pencil size={16} /></button><button onClick={() => deleteProduct(product)} aria-label={`Excluir ${product.name}`}><Trash2 size={16} /></button></div>
+                  </article>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {tab === "categories" && (
+            <section className="admin-view">
+              <div className="admin-page-title"><div><span>Organização do catálogo</span><h1>Categorias e subcategorias.</h1></div><button className="admin-primary" onClick={() => setCategoryDraft({ ...emptyCategory })}><Plus size={17} /> Nova categoria</button></div>
+              <div className="admin-helper-card"><FolderTree size={20} /><div><strong>Você controla o menu do site por aqui.</strong><p>Use uma categoria principal para linhas amplas e uma subcategoria para tipos como Presidente, Executiva ou Diretor.</p></div></div>
+              <div className="admin-category-list">
+                {categories.map((category) => (
+                  <article className={!category.active ? "is-muted" : ""} key={category.id}>
+                    <img src={category.imageUrl || "/images/spaces/loja-rony.webp"} alt="" />
+                    <div><span>{category.parentName ? `Subcategoria de ${category.parentName}` : "Categoria principal"}</span><strong>{category.name}</strong><small>/{category.slug}</small></div>
+                    <p>{category.description || "Sem descrição"}</p>
+                    <em className={category.active ? "is-active" : ""}>{category.active ? "Visível" : "Oculta"}</em>
+                    <div className="admin-row-actions"><button onClick={() => setCategoryDraft({ id: category.id, slug: category.slug, name: category.name, description: category.description, parentId: category.parentId, imageUrl: category.imageUrl, active: category.active, featured: category.featured, sortOrder: category.sortOrder })} aria-label={`Editar ${category.name}`}><Pencil size={16} /></button><button onClick={() => deleteCategory(category)} aria-label={`Remover ${category.name}`}><Trash2 size={16} /></button></div>
                   </article>
                 ))}
               </div>
@@ -378,8 +514,56 @@ export function AdminDashboard({
               )}
             </section>
           )}
+
+          {tab === "settings" && (
+            <section className="admin-view">
+              <div className="admin-page-title"><div><span>Informações públicas</span><h1>Loja, contatos e Google.</h1></div><button className="admin-primary" onClick={saveSettings} disabled={saving}>{saving ? <LoaderCircle className="spin" size={17} /> : <Check size={17} />} Salvar informações</button></div>
+              <div className="settings-admin-grid">
+                <div className="admin-form-card">
+                  <div className="admin-form-section-title"><Store size={19} /><div><strong>Identidade e comunicação</strong><span>Textos que aparecem no site.</span></div></div>
+                  <div className="admin-form-columns"><label><span>Nome da empresa</span><input value={siteSettings.businessName} onChange={(event) => setSiteSettings({ ...siteSettings, businessName: event.target.value })} /></label><label><span>Frase da marca</span><input value={siteSettings.tagline} onChange={(event) => setSiteSettings({ ...siteSettings, tagline: event.target.value })} /></label></div>
+                  <label><span>Faixa no topo do site</span><input value={siteSettings.announcement} onChange={(event) => setSiteSettings({ ...siteSettings, announcement: event.target.value })} /></label>
+                  <div className="admin-form-columns"><label><span>Título para o Google</span><input value={siteSettings.seoTitle} onChange={(event) => setSiteSettings({ ...siteSettings, seoTitle: event.target.value })} /></label><label><span>Descrição para o Google</span><textarea rows={3} value={siteSettings.seoDescription} onChange={(event) => setSiteSettings({ ...siteSettings, seoDescription: event.target.value })} /></label></div>
+                </div>
+                <div className="admin-form-card">
+                  <div className="admin-form-section-title"><MessageCircleMore size={19} /><div><strong>Atendimento</strong><span>Use somente números no WhatsApp, incluindo 55 e DDD.</span></div></div>
+                  <div className="admin-form-columns"><label><span>WhatsApp</span><input value={siteSettings.whatsappNumber} onChange={(event) => setSiteSettings({ ...siteSettings, whatsappNumber: event.target.value.replace(/\D/g, "") })} /></label><label><span>Telefone exibido</span><input value={siteSettings.phone} onChange={(event) => setSiteSettings({ ...siteSettings, phone: event.target.value })} /></label></div>
+                  <div className="admin-form-columns"><label><span>E-mail</span><input type="email" value={siteSettings.email} onChange={(event) => setSiteSettings({ ...siteSettings, email: event.target.value })} /></label><label><span>Instagram</span><input value={siteSettings.instagramUrl} onChange={(event) => setSiteSettings({ ...siteSettings, instagramUrl: event.target.value })} /></label></div>
+                  <label><span>Horário de atendimento</span><input value={siteSettings.openingHours} onChange={(event) => setSiteSettings({ ...siteSettings, openingHours: event.target.value })} /></label>
+                </div>
+                <div className="admin-form-card settings-wide">
+                  <div className="admin-form-section-title"><MapPin size={19} /><div><strong>Localização</strong><span>Endereço completo, versão curta e rota.</span></div></div>
+                  <label><span>Endereço completo</span><input value={siteSettings.address} onChange={(event) => setSiteSettings({ ...siteSettings, address: event.target.value })} /></label>
+                  <div className="admin-form-columns"><label><span>Endereço curto</span><input value={siteSettings.shortAddress} onChange={(event) => setSiteSettings({ ...siteSettings, shortAddress: event.target.value })} /></label><label><span>Link do Google Maps</span><input value={siteSettings.mapUrl} onChange={(event) => setSiteSettings({ ...siteSettings, mapUrl: event.target.value })} /></label></div>
+                </div>
+              </div>
+            </section>
+          )}
         </div>
       </section>
+
+      {categoryDraft && (
+        <div className="admin-modal-layer">
+          <button className="admin-modal-scrim" onClick={() => setCategoryDraft(null)} aria-label="Fechar edição" />
+          <section className="category-editor" role="dialog" aria-modal="true" aria-label="Editar categoria">
+            <header><div><span>{categoryDraft.id ? "Editar categoria" : "Nova categoria"}</span><h2>{categoryDraft.name || "Categoria sem nome"}</h2></div><button onClick={() => setCategoryDraft(null)} aria-label="Fechar"><X size={20} /></button></header>
+            <div className="category-editor-body">
+              <div className="admin-form-card">
+                <div className="admin-form-columns"><label><span>Nome *</span><input value={categoryDraft.name} onChange={(event) => setCategoryDraft({ ...categoryDraft, name: event.target.value, slug: categoryDraft.id ? categoryDraft.slug : makeSlug(event.target.value) })} /></label><label><span>Endereço *</span><input value={categoryDraft.slug} onChange={(event) => setCategoryDraft({ ...categoryDraft, slug: makeSlug(event.target.value) })} /></label></div>
+                <label><span>Descrição</span><textarea rows={4} value={categoryDraft.description} onChange={(event) => setCategoryDraft({ ...categoryDraft, description: event.target.value })} /></label>
+                <div className="admin-form-columns"><label><span>Categoria principal</span><select value={categoryDraft.parentId ?? ""} onChange={(event) => setCategoryDraft({ ...categoryDraft, parentId: event.target.value || null })}><option value="">Nenhuma — esta é principal</option>{categories.filter((item) => item.id !== categoryDraft.id && item.parentId === null).map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label><label><span>Ordem de exibição</span><input type="number" min="0" value={categoryDraft.sortOrder} onChange={(event) => setCategoryDraft({ ...categoryDraft, sortOrder: Number(event.target.value) || 0 })} /></label></div>
+                <div className="admin-toggle-stack"><label className="admin-toggle"><input type="checkbox" checked={categoryDraft.active} onChange={(event) => setCategoryDraft({ ...categoryDraft, active: event.target.checked })} /><span>Categoria visível</span></label><label className="admin-toggle"><input type="checkbox" checked={categoryDraft.featured} onChange={(event) => setCategoryDraft({ ...categoryDraft, featured: event.target.checked })} /><span>Mostrar nos atalhos e na página inicial</span></label></div>
+              </div>
+              <div className="product-image-editor category-image-editor">
+                <div className="product-image-editor-head"><div><FileImage size={18} /><span>Imagem da categoria</span></div><input ref={categoryFileRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => event.target.files?.[0] && uploadCategoryImage(event.target.files[0])} /><button onClick={() => categoryFileRef.current?.click()} disabled={uploading}>{uploading ? <LoaderCircle className="spin" size={16} /> : <Upload size={16} />} Enviar foto</button></div>
+                {categoryDraft.imageUrl ? <div className="category-image-preview"><img src={categoryDraft.imageUrl} alt="" /><button onClick={() => setCategoryDraft({ ...categoryDraft, imageUrl: "" })}><Trash2 size={15} /> Remover imagem</button></div> : <div className="product-image-empty"><ImagePlus size={28} /><strong>Adicione uma imagem</strong><span>Ela aparecerá no menu e na página da categoria.</span></div>}
+                <label className="manual-image-url"><span>Ou use um endereço de imagem</span><div><input value={categoryDraft.imageUrl} onChange={(event) => setCategoryDraft({ ...categoryDraft, imageUrl: event.target.value })} placeholder="/images/… ou https://…" /></div></label>
+              </div>
+            </div>
+            <footer><button className="admin-secondary" onClick={() => setCategoryDraft(null)}>Cancelar</button><button className="admin-primary" onClick={saveCategory} disabled={saving}>{saving ? <LoaderCircle className="spin" size={17} /> : <Check size={17} />}{saving ? "Salvando…" : "Salvar categoria"}</button></footer>
+          </section>
+        </div>
+      )}
 
       {selectedQuote && (
         <div className="admin-modal-layer">
@@ -406,12 +590,14 @@ export function AdminDashboard({
             <div className="product-editor-body">
               <div className="admin-form-card">
                 <div className="admin-form-columns"><label><span>Nome *</span><input value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value, slug: draft.id ? draft.slug : makeSlug(event.target.value) })} /></label><label><span>Endereço *</span><input value={draft.slug} onChange={(event) => setDraft({ ...draft, slug: makeSlug(event.target.value) })} /></label></div>
-                <div className="admin-form-columns"><label><span>Categoria *</span><select value={draft.categoryId} onChange={(event) => setDraft({ ...draft, categoryId: event.target.value })}>{categories.map((category) => <option value={category.id} key={category.id}>{category.name}</option>)}</select></label><label><span>Chamada curta</span><input value={draft.eyebrow} onChange={(event) => setDraft({ ...draft, eyebrow: event.target.value })} placeholder="Ex.: Base excêntrica" /></label></div>
+                <div className="admin-form-columns"><label><span>Categoria *</span><select value={draft.categoryId} onChange={(event) => setDraft({ ...draft, categoryId: event.target.value })}>{categories.filter((category) => category.active).map((category) => <option value={category.id} key={category.id}>{category.parentId ? `↳ ${category.name}` : category.name}</option>)}</select></label><label><span>Chamada curta</span><input value={draft.eyebrow} onChange={(event) => setDraft({ ...draft, eyebrow: event.target.value })} placeholder="Ex.: Base excêntrica" /></label></div>
                 <label><span>Resumo do card</span><textarea rows={2} value={draft.shortDescription} onChange={(event) => setDraft({ ...draft, shortDescription: event.target.value })} /></label>
                 <label><span>Descrição completa</span><textarea rows={5} value={draft.description} onChange={(event) => setDraft({ ...draft, description: event.target.value })} /></label>
-                <div className="admin-form-columns"><label><span>Preço atual</span><input value={currencyInput(draft.priceCents)} onChange={(event) => setDraft({ ...draft, priceCents: parseCurrency(event.target.value) })} inputMode="decimal" placeholder="1.580,00" /></label><label><span>Preço anterior (DE)</span><input value={currencyInput(draft.oldPriceCents)} onChange={(event) => setDraft({ ...draft, oldPriceCents: parseCurrency(event.target.value) })} inputMode="decimal" placeholder="2.119,49" /></label></div>
-                <div className="admin-form-columns"><label><span>Texto quando não há preço</span><input value={draft.priceLabel ?? ""} onChange={(event) => setDraft({ ...draft, priceLabel: event.target.value || null })} placeholder="Sob medida" /></label><label><span>Selo</span><input value={draft.badge ?? ""} onChange={(event) => setDraft({ ...draft, badge: event.target.value || null })} placeholder="Oferta, Novidade…" /></label></div>
+                <div className="admin-form-columns"><label><span>Como mostrar o preço</span><select value={draft.priceMode} onChange={(event) => { const mode = event.target.value as Product["priceMode"]; setDraft({ ...draft, priceMode: mode, priceCents: mode === "consult" || mode === "custom" ? null : draft.priceCents }); }}><option value="price">Preço exato</option><option value="from">A partir de</option><option value="consult">Sob consulta</option><option value="custom">Texto personalizado / sob medida</option></select></label><label><span>Disponibilidade</span><select value={draft.availability} onChange={(event) => setDraft({ ...draft, availability: event.target.value as Product["availability"] })}><option value="available">Disponível</option><option value="order">Por encomenda</option><option value="made_to_order">Produção sob medida</option><option value="out_of_stock">Indisponível por enquanto</option></select></label></div>
+                <div className="admin-form-columns"><label><span>Preço atual</span><input value={currencyInput(draft.priceCents)} onChange={(event) => setDraft({ ...draft, priceCents: parseCurrency(event.target.value) })} inputMode="decimal" placeholder="1.580,00" disabled={draft.priceMode === "consult" || draft.priceMode === "custom"} /></label><label><span>Preço anterior (DE)</span><input value={currencyInput(draft.oldPriceCents)} onChange={(event) => setDraft({ ...draft, oldPriceCents: parseCurrency(event.target.value) })} inputMode="decimal" placeholder="2.119,49" disabled={draft.priceMode === "consult" || draft.priceMode === "custom"} /></label></div>
+                <div className="admin-form-columns"><label><span>Texto personalizado do preço</span><input value={draft.priceLabel ?? ""} onChange={(event) => setDraft({ ...draft, priceLabel: event.target.value || null })} placeholder="Sob medida, consulte opções…" /></label><label><span>Selo</span><input value={draft.badge ?? ""} onChange={(event) => setDraft({ ...draft, badge: event.target.value || null })} placeholder="Oferta, Novidade…" /></label></div>
                 <label><span>Diferenciais <small>(um por linha)</small></span><textarea rows={4} value={draft.features.join("\n")} onChange={(event) => setDraft({ ...draft, features: event.target.value.split("\n").map((item) => item.trim()).filter(Boolean) })} /></label>
+                <label><span>Termos extras para pesquisa <small>(separados por espaço)</small></span><input value={draft.searchTerms} onChange={(event) => setDraft({ ...draft, searchTerms: event.target.value })} placeholder="ergonômica couro recepção home office…" /></label>
                 <div className="admin-form-columns"><label><span>Ordem no catálogo</span><input type="number" min="0" value={draft.sortOrder} onChange={(event) => setDraft({ ...draft, sortOrder: Number(event.target.value) || 0 })} /></label><div className="admin-toggle-stack"><label className="admin-toggle"><input type="checkbox" checked={draft.active} onChange={(event) => setDraft({ ...draft, active: event.target.checked })} /><span>Visível no site</span></label><label className="admin-toggle"><input type="checkbox" checked={draft.featured} onChange={(event) => setDraft({ ...draft, featured: event.target.checked })} /><span>Mostrar em destaque</span></label></div></div>
               </div>
 

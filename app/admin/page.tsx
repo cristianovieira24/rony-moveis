@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { AdminDashboard } from "@/components/admin-dashboard";
 import { ensureCurrentUserIsAdmin } from "@/lib/admin-auth";
-import { ensureSeedData, getAdminQuotes, getCampaign, getCategories, getProducts } from "@/lib/server-data";
+import { ensureSeedData, getAdminQuotes, getCampaign, getCategories, getProducts, getSiteSettings } from "@/lib/server-data";
 
 export const dynamic = "force-dynamic";
 
@@ -36,11 +36,12 @@ export default async function AdminPage() {
     );
   }
 
-  const [products, categories, campaign, quotes] = await Promise.all([
+  const [products, categories, campaign, quotes, siteSettings] = await Promise.all([
     getProducts({ includeInactive: true }),
-    getCategories(),
+    getCategories({ includeInactive: true }),
     getCampaign(),
     getAdminQuotes(),
+    getSiteSettings(),
   ]);
 
   return (
@@ -49,6 +50,7 @@ export default async function AdminPage() {
       categories={categories}
       campaign={campaign}
       quotes={quotes}
+      siteSettings={siteSettings}
       adminName={access.user.displayName}
       signOutPath="/api/admin/logout"
     />

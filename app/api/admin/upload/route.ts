@@ -1,11 +1,13 @@
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { NextResponse } from "next/server";
 import { requireAdminApi } from "@/lib/admin-auth";
+import { isSameOriginMutation } from "@/lib/security";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   try {
+    if (!isSameOriginMutation(request)) return NextResponse.json({ error: "Origem inválida." }, { status: 403 });
     const body = (await request.json()) as HandleUploadBody;
     if (body.type === "blob.generate-client-token" && !(await requireAdminApi())) {
       return NextResponse.json({ error: "Não autorizado." }, { status: 401 });

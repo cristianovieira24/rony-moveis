@@ -1,8 +1,8 @@
 import { SITE_URL, WHATSAPP_NUMBER } from "./catalog";
 import type { Product } from "./types";
 
-export function whatsappUrl(message: string) {
-  return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
+export function whatsappUrl(message: string, number = WHATSAPP_NUMBER) {
+  return `https://wa.me/${number.replace(/\D/g, "")}?text=${encodeURIComponent(message)}`;
 }
 
 export function productWhatsAppMessage(product: Pick<Product, "name" | "slug">) {

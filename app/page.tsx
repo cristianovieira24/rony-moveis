@@ -5,6 +5,7 @@ import {
   ArrowUpRight,
   BadgeCheck,
   Compass,
+  Camera,
   MapPin,
   MessageCircle,
   Ruler,
@@ -18,14 +19,16 @@ import { whatsappUrl } from "@/lib/whatsapp";
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  const { products, categories, campaign } = await getPublicSnapshot();
+  const { products, categories, campaign, settings } = await getPublicSnapshot();
   const featured = products.filter((product) => product.featured).slice(0, 4);
+  const heroProduct = featured[0];
+  const mainCategories = categories.filter((category) => category.parentId === null && category.featured);
   const localBusiness = {
     "@context": "https://schema.org",
     "@type": "FurnitureStore",
-    name: "Rony Móveis",
-    telephone: "+55 62 99998-1746",
-    email: "ronymoveis12@gmail.com",
+    name: settings.businessName,
+    telephone: settings.phone,
+    email: settings.email,
     address: {
       "@type": "PostalAddress",
       streetAddress: "Av. C-12, 108",
@@ -34,20 +37,18 @@ export default async function Home() {
       postalCode: "74305-010",
       addressCountry: "BR",
     },
-    sameAs: ["https://www.instagram.com/ronymoveisgoiania/"],
+    sameAs: [settings.instagramUrl],
   };
 
   return (
     <main>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(localBusiness) }} />
       <div className="announcement-bar">
-        <span>Atendimento em Goiânia</span>
-        <span className="announcement-dot" />
-        <span>Casa, escritório e planejados</span>
+        <span>{settings.announcement}</span>
         <Link href="/orcamento">Peça seu orçamento <ArrowRight size={14} /></Link>
       </div>
 
-      <section className="hero">
+      {campaign.active && <section className="hero">
         <div className="hero-copy">
           <span className="hero-eyebrow"><Sparkles size={15} /> {campaign.eyebrow}</span>
           <h1>{campaign.title}</h1>
@@ -75,19 +76,12 @@ export default async function Home() {
             <span>Do produto ao projeto</span>
             <strong>Escolhas para cada espaço.</strong>
           </div>
-          <div className="hero-card hero-card-bottom">
-            <img src="/images/products/atlanta.webp" alt="Poltrona Atlanta" />
-            <div>
-              <span>Em destaque</span>
-              <strong>Poltrona Atlanta</strong>
-              <Link href="/produto/poltrona-atlanta-rivatti">Conhecer <ArrowUpRight size={14} /></Link>
-            </div>
-          </div>
+          {heroProduct && <div className="hero-card hero-card-bottom"><img src={heroProduct.images[0] || "/images/spaces/loja-rony.webp"} alt={heroProduct.name} /><div><span>Em destaque</span><strong>{heroProduct.name}</strong><Link href={`/produto/${heroProduct.slug}`}>Conhecer <ArrowUpRight size={14} /></Link></div></div>}
           <a className="hero-scroll" href="#categorias" aria-label="Ir para categorias">
             <ArrowDown size={18} />
           </a>
         </div>
-      </section>
+      </section>}
 
       <section className="category-section section-pad" id="categorias">
         <div className="section-heading" data-reveal>
@@ -96,7 +90,7 @@ export default async function Home() {
           <p>Explore por categoria ou fale com a equipe para chegar à melhor escolha.</p>
         </div>
         <div className="category-grid">
-          {categories.map((category, index) => (
+          {mainCategories.map((category, index) => (
             <Link
               href={`/categoria/${category.slug}`}
               className={`category-card category-card-${index + 1}`}
@@ -104,7 +98,7 @@ export default async function Home() {
               data-reveal
               style={{ "--delay": `${index * 60}ms` } as React.CSSProperties}
             >
-              <img src={CATEGORY_META_BY_SLUG[category.slug]?.image ?? "/images/spaces/loja-rony.webp"} alt="" loading="lazy" />
+              <img src={category.imageUrl || CATEGORY_META_BY_SLUG[category.slug]?.image || "/images/spaces/loja-rony.webp"} alt="" loading="lazy" />
               <span className="category-number">0{index + 1}</span>
               <div>
                 <h3>{category.name}</h3>
@@ -166,10 +160,10 @@ export default async function Home() {
             Nossa loja reúne cadeiras, poltronas, móveis para casa e escritório, além do atendimento para projetos planejados.
           </p>
           <div className="store-facts">
-            <div><MapPin size={19} /><span>Av. C-12, 108<br />Setor Sudoeste — Goiânia</span></div>
-            <div><Compass size={19} /><a href="https://maps.app.goo.gl/5Nz2rNHnaPNy8KGv9" target="_blank" rel="noreferrer">Abrir rota no Google Maps <ArrowUpRight size={14} /></a></div>
+            <div><MapPin size={19} /><span>{settings.shortAddress}</span></div>
+            <div><Compass size={19} /><a href={settings.mapUrl} target="_blank" rel="noreferrer">Abrir rota no Google Maps <ArrowUpRight size={14} /></a></div>
           </div>
-          <a className="button button-outline" href={whatsappUrl("Olá, Rony Móveis! Gostaria de saber mais sobre os produtos disponíveis na loja.")} target="_blank" rel="noreferrer">
+          <a className="button button-outline" href={whatsappUrl("Olá, Rony Móveis! Gostaria de saber mais sobre os produtos disponíveis na loja.", settings.whatsappNumber)} target="_blank" rel="noreferrer">
             Falar com Rony Móveis <ArrowUpRight size={18} />
           </a>
         </div>
@@ -177,6 +171,11 @@ export default async function Home() {
           <img src="/images/spaces/loja-rony.webp" alt="Fachada da Rony Móveis em Goiânia" loading="lazy" />
           <span>Loja física · Setor Sudoeste</span>
         </div>
+      </section>
+
+      <section className="instagram-cta section-pad" data-reveal>
+        <div><Camera size={26} /><span>Acompanhe novidades, ofertas e produtos que chegam à loja.</span></div>
+        <a href={settings.instagramUrl} target="_blank" rel="noreferrer">@ronymoveisgoiania <ArrowUpRight size={18} /></a>
       </section>
 
       <section className="closing-cta section-pad" data-reveal>

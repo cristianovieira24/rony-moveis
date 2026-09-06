@@ -12,25 +12,33 @@ export function CatalogExplorer({ products, categories }: { products: Product[];
   const searchParams = useSearchParams();
   const initialCategory = searchParams.get("categoria") ?? "todos";
   const [category, setCategory] = useState(initialCategory);
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(searchParams.get("q") ?? "");
   const [onlyOffers, setOnlyOffers] = useState(false);
+
+  const mainCategories = useMemo(() => categories.filter((item) => item.parentId === null && item.featured), [categories]);
 
   const categoryCounts = useMemo(() => {
     return products.reduce<Record<string, number>>((counts, product) => {
       counts[product.categorySlug] = (counts[product.categorySlug] ?? 0) + 1;
+      const productCategory = categories.find((item) => item.id === product.categoryId);
+      const parent = productCategory?.parentId ? categories.find((item) => item.id === productCategory.parentId) : null;
+      if (parent) counts[parent.slug] = (counts[parent.slug] ?? 0) + 1;
       return counts;
     }, {});
-  }, [products]);
+  }, [categories, products]);
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase("pt-BR");
     return products.filter((product) => {
-      const matchesCategory = category === "todos" || product.categorySlug === category;
-      const matchesQuery = !needle || `${product.name} ${product.shortDescription} ${product.categoryName}`.toLocaleLowerCase("pt-BR").includes(needle);
+      const productCategory = categories.find((item) => item.id === product.categoryId);
+      const parent = productCategory?.parentId ? categories.find((item) => item.id === productCategory.parentId) : null;
+      const matchesCategory = category === "todos" || product.categorySlug === category || parent?.slug === category;
+      const haystack = `${product.name} ${product.eyebrow} ${product.shortDescription} ${product.description} ${product.categoryName} ${parent?.name ?? ""} ${product.features.join(" ")} ${product.searchTerms}`.toLocaleLowerCase("pt-BR");
+      const matchesQuery = !needle || haystack.includes(needle);
       const matchesOffer = !onlyOffers || product.oldPriceCents !== null;
       return matchesCategory && matchesQuery && matchesOffer;
     });
-  }, [category, onlyOffers, products, query]);
+  }, [categories, category, onlyOffers, products, query]);
 
   return (
     <main className="catalog-page">
@@ -48,7 +56,7 @@ export function CatalogExplorer({ products, categories }: { products: Product[];
           <small>Selecione uma linha para ver a página completa</small>
         </div>
         <div className="catalog-directory-grid">
-          {categories.map((item) => {
+          {mainCategories.map((item) => {
             const meta = CATEGORY_META_BY_SLUG[item.slug];
             return (
               <Link href={`/categoria/${item.slug}`} key={item.id}>
@@ -73,7 +81,7 @@ export function CatalogExplorer({ products, categories }: { products: Product[];
         <div className="catalog-filter-row">
           <button className={category === "todos" ? "is-active" : ""} onClick={() => setCategory("todos")}>Todos</button>
           {categories.map((item) => (
-            <button className={category === item.slug ? "is-active" : ""} onClick={() => setCategory(item.slug)} key={item.id}>{item.name}</button>
+            <button className={category === item.slug ? "is-active" : ""} onClick={() => setCategory(item.slug)} key={item.id}>{item.parentId ? `↳ ${item.name}` : item.name}</button>
           ))}
         </div>
         <button className={`offer-filter ${onlyOffers ? "is-active" : ""}`} onClick={() => setOnlyOffers((value) => !value)}>

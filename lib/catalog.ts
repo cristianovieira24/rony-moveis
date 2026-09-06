@@ -1,4 +1,4 @@
-import type { Campaign, Category, Product } from "./types";
+import type { Campaign, Category, Product, SiteSettings } from "./types";
 
 export const WHATSAPP_NUMBER = "5562999981746";
 export const STORE_PHONE = "(62) 99998-1746";
@@ -6,49 +6,92 @@ export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://ronymoveis
 export const STORE_ADDRESS =
   "Av. C-12, 108 — Setor Sudoeste, Goiânia — GO, 74305-010";
 
+export const DEFAULT_SITE_SETTINGS: SiteSettings = {
+  businessName: "Rony Móveis",
+  tagline: "Móveis para viver e trabalhar melhor.",
+  announcement: "Atendimento em Goiânia · Casa, escritório e planejados",
+  whatsappNumber: WHATSAPP_NUMBER,
+  phone: STORE_PHONE,
+  email: "ronymoveis12@gmail.com",
+  instagramUrl: "https://www.instagram.com/ronymoveisgoiania/",
+  address: STORE_ADDRESS,
+  shortAddress: "Av. C-12, 108 · Setor Sudoeste · Goiânia",
+  mapUrl: "https://maps.app.goo.gl/5Nz2rNHnaPNy8KGv9",
+  openingHours: "Consulte o horário de atendimento pelo WhatsApp",
+  seoTitle: "Rony Móveis | Casa, escritório e planejados em Goiânia",
+  seoDescription: "Móveis para casa e escritório, cadeiras, poltronas, estofados e projetos planejados com atendimento em Goiânia.",
+};
+
+function category(input: Omit<Category, "parentName" | "active" | "featured"> & Partial<Pick<Category, "parentName" | "active" | "featured">>): Category {
+  return {
+    ...input,
+    parentName: input.parentName ?? null,
+    active: input.active ?? true,
+    featured: input.featured ?? true,
+  };
+}
+
 export const seedCategories: Category[] = [
-  {
+  category({
     id: "cat-poltronas",
     slug: "poltronas",
     name: "Poltronas",
     description: "Conforto para receber, descansar e trabalhar melhor.",
+    parentId: null,
+    imageUrl: "/images/products/melfi.webp",
     sortOrder: 1,
-  },
-  {
+  }),
+  category({
     id: "cat-cadeiras",
     slug: "cadeiras",
     name: "Cadeiras de escritório",
     description: "Modelos presidenciais, executivos, secretária e gamer.",
+    parentId: null,
+    imageUrl: "/images/spaces/cadeiras-escritorio.webp",
     sortOrder: 2,
-  },
-  {
+  }),
+  category({
     id: "cat-escritorio",
     slug: "escritorio",
     name: "Móveis para escritório",
     description: "Mesas, armários, estações e ambientes corporativos.",
+    parentId: null,
+    imageUrl: "/images/spaces/mesa-escritorio.webp",
     sortOrder: 3,
-  },
-  {
+  }),
+  category({
     id: "cat-planejados",
     slug: "planejados",
     name: "Móveis planejados",
     description: "Projetos sob medida para casa, escritório ou comércio.",
+    parentId: null,
+    imageUrl: "/images/spaces/cozinha-madeira.webp",
     sortOrder: 4,
-  },
-  {
+  }),
+  category({
     id: "cat-estofados",
     slug: "estofados",
     name: "Estofados",
     description: "Peças que combinam presença, acabamento e conforto.",
+    parentId: null,
+    imageUrl: "/images/products/atlanta.webp",
     sortOrder: 5,
-  },
-  {
+  }),
+  category({
     id: "cat-aco",
     slug: "moveis-de-aco",
     name: "Móveis de aço",
     description: "Organização resistente para arquivos e ambientes de trabalho.",
+    parentId: null,
+    imageUrl: "/images/spaces/loja-rony.webp",
     sortOrder: 6,
-  },
+  }),
+  category({ id: "cat-presidente", slug: "cadeiras-presidente", name: "Cadeiras Presidente", description: "Conforto, presença e apoio para jornadas mais longas.", parentId: "cat-cadeiras", imageUrl: "/images/spaces/cadeiras-escritorio.webp", sortOrder: 21 }),
+  category({ id: "cat-executiva", slug: "cadeiras-executivas", name: "Cadeiras Executivas", description: "Ergonomia e acabamento para escritórios e home office.", parentId: "cat-cadeiras", imageUrl: "/images/spaces/mesa-escritorio.webp", sortOrder: 22 }),
+  category({ id: "cat-diretor", slug: "cadeiras-diretor", name: "Cadeiras Diretor", description: "Modelos versáteis para estações, salas e escritórios.", parentId: "cat-cadeiras", imageUrl: "/images/spaces/escritorio-planejado.webp", sortOrder: 23 }),
+  category({ id: "cat-secretaria", slug: "cadeiras-secretaria", name: "Cadeiras Secretária", description: "Opções funcionais para a rotina de trabalho.", parentId: "cat-cadeiras", imageUrl: "/images/spaces/cadeiras-escritorio.webp", sortOrder: 24 }),
+  category({ id: "cat-gamer", slug: "cadeiras-gamer", name: "Cadeiras Gamer", description: "Apoio e estilo para jogos, estudo e trabalho.", parentId: "cat-cadeiras", imageUrl: "/images/spaces/cadeiras-escritorio.webp", sortOrder: 25 }),
+  category({ id: "cat-banquetas", slug: "banquetas", name: "Banquetas", description: "Modelos para bancadas, cozinhas e ambientes comerciais.", parentId: "cat-cadeiras", imageUrl: "/images/spaces/cozinha-cobre.webp", sortOrder: 26 }),
 ];
 
 export const seedProducts: Product[] = [
@@ -66,6 +109,9 @@ export const seedProducts: Product[] = [
     priceCents: 158000,
     oldPriceCents: 211949,
     priceLabel: null,
+    priceMode: "price",
+    availability: "available",
+    searchTerms: "poltrona giratória sala recepção base excêntrica rivatti",
     badge: "Oferta",
     features: ["Base excêntrica giratória", "Design Rivatti", "Conforto envolvente"],
     images: ["/images/products/atlanta.webp"],
@@ -87,6 +133,9 @@ export const seedProducts: Product[] = [
     priceCents: 198000,
     oldPriceCents: 289900,
     priceLabel: null,
+    priceMode: "price",
+    availability: "available",
+    searchTerms: "poltrona giratória encosto alto base excêntrica rivatti",
     badge: "Oferta",
     features: ["Base excêntrica", "Encosto alto", "Acabamento Rivatti"],
     images: ["/images/products/melfi.webp"],
@@ -108,6 +157,9 @@ export const seedProducts: Product[] = [
     priceCents: 248000,
     oldPriceCents: 376300,
     priceLabel: null,
+    priceMode: "price",
+    availability: "available",
+    searchTerms: "poltrona reclinável massagem descanso nove pontos",
     badge: "Mais conforto",
     features: ["9 pontos de massagem", "Sistema reclinável", "Apoio para pernas"],
     images: ["/images/products/louisiana.webp"],
@@ -129,6 +181,9 @@ export const seedProducts: Product[] = [
     priceCents: 298000,
     oldPriceCents: 380000,
     priceLabel: null,
+    priceMode: "price",
+    availability: "available",
+    searchTerms: "poltrona couro natural clássica executiva recepção rivatti",
     badge: "Couro natural",
     features: ["Couro natural", "Design Rivatti", "Acabamento premium"],
     images: ["/images/products/elizabeth.webp"],
@@ -150,6 +205,9 @@ export const seedProducts: Product[] = [
     priceCents: 248000,
     oldPriceCents: 309000,
     priceLabel: "Couríssimo R$ 2.480 · couro natural R$ 3.480",
+    priceMode: "from",
+    availability: "available",
+    searchTerms: "charles eames couro natural couríssimo design clássico rivatti",
     badge: "2 revestimentos",
     features: ["Couríssimo ou couro natural", "Design clássico", "Base giratória"],
     images: ["/images/products/charles-eames.webp"],
@@ -171,6 +229,9 @@ export const seedProducts: Product[] = [
     priceCents: 298000,
     oldPriceCents: 397000,
     priceLabel: null,
+    priceMode: "price",
+    availability: "available",
+    searchTerms: "poltrona massagem elétrica reclinável descanso rivatti",
     badge: "Elétrica",
     features: ["Massagem elétrica", "Reclinável", "Conforto ampliado"],
     images: ["/images/products/michigan.webp"],
@@ -192,6 +253,9 @@ export const seedProducts: Product[] = [
     priceCents: null,
     oldPriceCents: null,
     priceLabel: "Sob medida",
+    priceMode: "custom",
+    availability: "made_to_order",
+    searchTerms: "home office planejado marcenaria bancada armário escritório",
     badge: "Planejados",
     features: ["Projeto personalizado", "Escolha de acabamentos", "Aproveitamento do espaço"],
     images: ["/images/spaces/escritorio-planejado.webp", "/images/spaces/marcenaria-nogueira.webp"],
@@ -213,6 +277,9 @@ export const seedProducts: Product[] = [
     priceCents: null,
     oldPriceCents: null,
     priceLabel: "Solicite uma proposta",
+    priceMode: "custom",
+    availability: "made_to_order",
+    searchTerms: "cozinha planejada marcenaria sob medida armários ferragens",
     badge: "Projeto",
     features: ["Sob medida", "Ferragens selecionadas", "Iluminação integrada"],
     images: ["/images/spaces/cozinha-cobre.webp", "/images/spaces/cozinha-madeira.webp"],
@@ -234,6 +301,9 @@ export const seedProducts: Product[] = [
     priceCents: null,
     oldPriceCents: null,
     priceLabel: "Consulte os modelos",
+    priceMode: "consult",
+    availability: "available",
+    searchTerms: "cadeira presidente executiva diretor secretária gamer home office ergonomia",
     badge: "Pronta entrega",
     features: ["Modelos ergonômicos", "Diversos acabamentos", "Atendimento na loja"],
     images: ["/images/spaces/cadeiras-escritorio.webp", "/images/spaces/mesa-escritorio.webp"],
@@ -262,4 +332,19 @@ export function formatPrice(value: number | null) {
     style: "currency",
     currency: "BRL",
   }).format(value / 100);
+}
+
+export const AVAILABILITY_LABELS: Record<Product["availability"], string> = {
+  available: "Disponível",
+  order: "Por encomenda",
+  made_to_order: "Produção sob medida",
+  out_of_stock: "Indisponível por enquanto",
+};
+
+export function productPriceText(product: Pick<Product, "priceCents" | "priceLabel" | "priceMode">) {
+  const price = formatPrice(product.priceCents);
+  if (product.priceMode === "from" && price) return `A partir de ${price}`;
+  if (product.priceMode === "consult") return product.priceLabel || "Preço sob consulta";
+  if (product.priceMode === "custom") return product.priceLabel || "Solicite uma proposta";
+  return price || product.priceLabel || "Preço sob consulta";
 }

@@ -1,5 +1,5 @@
-import { seedCampaign, seedCategories, seedProducts } from "./catalog";
-import type { Campaign, Category, Product, QuoteSummary } from "./types";
+import { DEFAULT_SITE_SETTINGS, seedCampaign, seedCategories, seedProducts } from "./catalog";
+import type { Campaign, Category, Product, QuoteSummary, SiteSettings } from "./types";
 import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
 
 type Statement = {
@@ -100,8 +100,16 @@ async function ensureDatabaseSchema(sql: NeonQueryFunction<false, false>) {
         key TEXT PRIMARY KEY, value TEXT NOT NULL,
         updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
       )`,
+      "ALTER TABLE categories ADD COLUMN IF NOT EXISTS parent_id TEXT REFERENCES categories(id) ON DELETE SET NULL",
+      "ALTER TABLE categories ADD COLUMN IF NOT EXISTS image_url TEXT NOT NULL DEFAULT ''",
+      "ALTER TABLE categories ADD COLUMN IF NOT EXISTS object_key TEXT",
+      "ALTER TABLE categories ADD COLUMN IF NOT EXISTS featured INTEGER NOT NULL DEFAULT 1",
+      "ALTER TABLE products ADD COLUMN IF NOT EXISTS price_mode TEXT NOT NULL DEFAULT 'price'",
+      "ALTER TABLE products ADD COLUMN IF NOT EXISTS availability TEXT NOT NULL DEFAULT 'available'",
+      "ALTER TABLE products ADD COLUMN IF NOT EXISTS search_terms TEXT NOT NULL DEFAULT ''",
       "CREATE INDEX IF NOT EXISTS products_category_idx ON products(category_id)",
       "CREATE INDEX IF NOT EXISTS products_sort_idx ON products(active, sort_order)",
+      "CREATE INDEX IF NOT EXISTS categories_parent_idx ON categories(parent_id, sort_order)",
       "CREATE INDEX IF NOT EXISTS product_images_product_idx ON product_images(product_id, sort_order)",
       "CREATE INDEX IF NOT EXISTS quote_requests_status_idx ON quote_requests(status, created_at)",
     ];
@@ -130,7 +138,7 @@ export async function ensureSeedData() {
     .prepare("SELECT value FROM site_settings WHERE key = ?")
     .bind("seed_version")
     .first<{ value: string }>();
-  if (marker?.value === "1") return;
+  if (marker?.value === "2") return;
 
   const statements: Statement[] = [];
   for (const category of seedCategories) {
@@ -138,8 +146,8 @@ export async function ensureSeedData() {
       db
         .prepare(
           `INSERT INTO categories
-           (id, slug, name, description, sort_order, active)
-           VALUES (?, ?, ?, ?, ?, 1)
+           (id, slug, name, description, parent_id, image_url, featured, sort_order, active)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT(id) DO NOTHING`,
         )
         .bind(
@@ -147,8 +155,20 @@ export async function ensureSeedData() {
           category.slug,
           category.name,
           category.description,
+          category.parentId,
+          category.imageUrl,
+          category.featured ? 1 : 0,
           category.sortOrder,
+          category.active ? 1 : 0,
         ),
+    );
+    statements.push(
+      db
+        .prepare(
+          `UPDATE categories SET image_url = CASE WHEN image_url = '' THEN ? ELSE image_url END,
+           featured = COALESCE(featured, ?), updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+        )
+        .bind(category.imageUrl, category.featured ? 1 : 0, category.id),
     );
   }
 
@@ -158,9 +178,9 @@ export async function ensureSeedData() {
         .prepare(
           `INSERT INTO products
            (id, slug, name, eyebrow, short_description, description, category_id,
-            price_cents, old_price_cents, price_label, badge, features_json,
-            active, featured, sort_order)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            price_cents, old_price_cents, price_label, price_mode, availability,
+            search_terms, badge, features_json, active, featured, sort_order)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT(id) DO NOTHING`,
         )
         .bind(
@@ -174,12 +194,23 @@ export async function ensureSeedData() {
           product.priceCents,
           product.oldPriceCents,
           product.priceLabel,
+          product.priceMode,
+          product.availability,
+          product.searchTerms,
           product.badge,
           JSON.stringify(product.features),
           product.active ? 1 : 0,
           product.featured ? 1 : 0,
           product.sortOrder,
         ),
+    );
+    statements.push(
+      db
+        .prepare(
+          `UPDATE products SET price_mode = ?, availability = ?, search_terms = ?, updated_at = CURRENT_TIMESTAMP
+           WHERE id = ? AND search_terms = ''`,
+        )
+        .bind(product.priceMode, product.availability, product.searchTerms, product.id),
     );
 
     product.images.forEach((image, imageIndex) => {
@@ -202,6 +233,15 @@ export async function ensureSeedData() {
     });
   }
 
+  statements.push(
+    db
+      .prepare(
+        `INSERT INTO site_settings (key, value, updated_at)
+         VALUES (?, ?, CURRENT_TIMESTAMP)
+         ON CONFLICT(key) DO NOTHING`,
+      )
+      .bind("store_profile", JSON.stringify(DEFAULT_SITE_SETTINGS)),
+  );
   statements.push(
     db
       .prepare(
@@ -229,7 +269,7 @@ export async function ensureSeedData() {
          VALUES (?, ?, CURRENT_TIMESTAMP)
          ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP`,
       )
-      .bind("seed_version", "1"),
+      .bind("seed_version", "2"),
   );
 
   await db.batch(statements);
@@ -248,6 +288,9 @@ type ProductRow = {
   price_cents: number | null;
   old_price_cents: number | null;
   price_label: string | null;
+  price_mode: Product["priceMode"];
+  availability: Product["availability"];
+  search_terms: string;
   badge: string | null;
   features_json: string;
   active: number;
@@ -294,6 +337,9 @@ function mapProducts(rows: ProductRow[], imageRows: ImageRow[]) {
     priceCents: row.price_cents,
     oldPriceCents: row.old_price_cents,
     priceLabel: row.price_label,
+    priceMode: ["price", "from", "consult", "custom"].includes(row.price_mode) ? row.price_mode : "price",
+    availability: ["available", "order", "made_to_order", "out_of_stock"].includes(row.availability) ? row.availability : "available",
+    searchTerms: row.search_terms,
     badge: row.badge,
     features: parseFeatures(row.features_json),
     images: (byProduct.get(row.id) ?? [])
@@ -308,7 +354,7 @@ function mapProducts(rows: ProductRow[], imageRows: ImageRow[]) {
 export async function getProducts(options?: { includeInactive?: boolean }) {
   await ensureSeedData();
   const db = await getDatabase();
-  const where = options?.includeInactive ? "" : "WHERE p.active = 1";
+  const where = options?.includeInactive ? "" : "WHERE p.active = 1 AND c.active = 1";
   const productResult = await db.prepare(
     `SELECT p.*, c.slug AS category_slug, c.name AS category_name
      FROM products p
@@ -327,19 +373,28 @@ export async function getProductBySlug(slug: string) {
   return products.find((product) => product.slug === slug) ?? null;
 }
 
-export async function getCategories() {
+export async function getCategories(options?: { includeInactive?: boolean }) {
   await ensureSeedData();
   const db = await getDatabase();
   const result = await db
     .prepare(
-      `SELECT id, slug, name, description, sort_order
-       FROM categories WHERE active = 1 ORDER BY sort_order ASC`,
+      `SELECT c.id, c.slug, c.name, c.description, c.parent_id, p.name AS parent_name,
+              c.image_url, c.active, c.featured, c.sort_order
+       FROM categories c
+       LEFT JOIN categories p ON p.id = c.parent_id
+       ${options?.includeInactive ? "" : "WHERE c.active = 1"}
+       ORDER BY c.sort_order ASC, c.name ASC`,
     )
     .all<{
       id: string;
       slug: string;
       name: string;
       description: string;
+      parent_id: string | null;
+      parent_name: string | null;
+      image_url: string;
+      active: number;
+      featured: number;
       sort_order: number;
     }>();
   return (result.results ?? []).map<Category>((row) => ({
@@ -347,15 +402,50 @@ export async function getCategories() {
     slug: row.slug,
     name: row.name,
     description: row.description,
+    parentId: row.parent_id,
+    parentName: row.parent_name,
+    imageUrl: row.image_url,
+    active: row.active === 1,
+    featured: row.featured === 1,
     sortOrder: row.sort_order,
   }));
+}
+
+function parseSiteSettings(value: string | undefined | null): SiteSettings {
+  if (!value) return DEFAULT_SITE_SETTINGS;
+  try {
+    const parsed = JSON.parse(value) as Partial<SiteSettings>;
+    return { ...DEFAULT_SITE_SETTINGS, ...parsed };
+  } catch {
+    return DEFAULT_SITE_SETTINGS;
+  }
+}
+
+export async function getSiteSettings() {
+  await ensureSeedData();
+  const db = await getDatabase();
+  const row = await db
+    .prepare("SELECT value FROM site_settings WHERE key = ?")
+    .bind("store_profile")
+    .first<{ value: string }>();
+  return parseSiteSettings(row?.value);
+}
+
+export async function getSiteChromeData() {
+  try {
+    const [categories, settings] = await Promise.all([getCategories(), getSiteSettings()]);
+    return { categories, settings };
+  } catch (error) {
+    console.error("Falha ao carregar dados globais do site", error);
+    return { categories: seedCategories, settings: DEFAULT_SITE_SETTINGS };
+  }
 }
 
 export async function getCampaign() {
   await ensureSeedData();
   const db = await getDatabase();
   const row = await db
-    .prepare("SELECT * FROM campaigns WHERE kind = ? AND active = 1 LIMIT 1")
+    .prepare("SELECT * FROM campaigns WHERE kind = ? LIMIT 1")
     .bind("hero")
     .first<{
       id: string;
@@ -384,18 +474,20 @@ export async function getCampaign() {
 
 export async function getPublicSnapshot() {
   try {
-    const [products, categories, campaign] = await Promise.all([
+    const [products, categories, campaign, settings] = await Promise.all([
       getProducts(),
       getCategories(),
       getCampaign(),
+      getSiteSettings(),
     ]);
-    return { products, categories, campaign, connected: true };
+    return { products, categories, campaign, settings, connected: true };
   } catch (error) {
     console.error("Falha ao carregar o catálogo persistido", error);
     return {
       products: seedProducts,
       categories: seedCategories,
       campaign: seedCampaign,
+      settings: DEFAULT_SITE_SETTINGS,
       connected: false,
     };
   }
