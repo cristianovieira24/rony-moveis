@@ -58,7 +58,7 @@ export default async function CategoryPage({ params }: { params: Promise<{ slug:
         </div>
         <div className={`category-page-image is-${category.imageFit}`}>
           <img src={category.imageUrl || meta?.heroImage || meta?.image || "/images/spaces/loja-rony.webp"} alt={category.name} decoding="async" fetchPriority="high" />
-          <div>
+          <div className="category-count-badge" style={{ right: "28px", bottom: "28px", minWidth: "0", minHeight: "0", width: "auto", padding: "12px 16px", borderRadius: "12px", gap: "10px", background: "rgba(37, 38, 34, .72)", border: "1px solid rgba(255,255,255,.18)" }}>
             <span>{products.length ? String(products.length).padStart(2, "0") : "Loja"}</span>
             <small>{products.length ? (products.length === 1 ? "item no catálogo" : "itens no catálogo") : "consulte opções"}</small>
           </div>
