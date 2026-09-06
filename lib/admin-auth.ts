@@ -1,4 +1,4 @@
-import { createHmac, scryptSync, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, scryptSync, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 
 export const ADMIN_COOKIE = "rony_admin_session";
@@ -7,16 +7,27 @@ const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7;
 type SessionPayload = { email: string; exp: number };
 
 function adminConfig() {
+  const password = process.env.ADMIN_PASSWORD ?? "";
+  const configuredSessionSecret = process.env.ADMIN_SESSION_SECRET?.trim() ?? "";
+  const derivedSessionSecret = password
+    ? createHash("sha256").update(`rony-moveis-admin-session:${password}`).digest("base64url")
+    : "";
+
   return {
     email: process.env.ADMIN_EMAIL?.trim().toLowerCase() ?? "",
+    password,
     passwordHash: process.env.ADMIN_PASSWORD_HASH?.trim() ?? "",
-    sessionSecret: process.env.ADMIN_SESSION_SECRET?.trim() ?? "",
+    sessionSecret: configuredSessionSecret || derivedSessionSecret,
   };
 }
 
 export function isAdminConfigured() {
   const config = adminConfig();
-  return Boolean(config.email && config.passwordHash && config.sessionSecret.length >= 32);
+  return Boolean(
+    config.email &&
+      (config.password || config.passwordHash) &&
+      config.sessionSecret.length >= 32,
+  );
 }
 
 function signature(value: string, secret: string) {
@@ -59,6 +70,13 @@ export async function getAdminSession() {
 export async function verifyAdminCredentials(email: string, password: string) {
   const config = adminConfig();
   if (!isAdminConfigured() || email.trim().toLowerCase() !== config.email) return false;
+
+  if (config.password) {
+    const expected = createHash("sha256").update(config.password).digest();
+    const supplied = createHash("sha256").update(password).digest();
+    return timingSafeEqual(supplied, expected);
+  }
+
   const [algorithm, saltValue, expectedValue] = config.passwordHash.split("$");
   if (algorithm !== "scrypt" || !saltValue || !expectedValue) return false;
   try {

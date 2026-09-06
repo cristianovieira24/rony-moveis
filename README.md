@@ -24,11 +24,10 @@ Copie `.env.example` para `.env.local` e preencha as credenciais dos serviços.
 - `DATABASE_URL`: conexão Postgres criada pela integração Neon na Vercel
 - `BLOB_READ_WRITE_TOKEN`: token criado pela integração Vercel Blob
 - `ADMIN_EMAIL`: e-mail autorizado a entrar no painel
-- `ADMIN_PASSWORD_HASH`: senha convertida para hash Scrypt
-- `ADMIN_SESSION_SECRET`: valor aleatório com pelo menos 32 caracteres
+- `ADMIN_PASSWORD`: senha forte, cadastrada como Secret na Vercel
 - `NEXT_PUBLIC_SITE_URL`: endereço público final, sem barra no fim
 
-Para gerar o hash da senha administrativa:
+O painel funciona somente com `ADMIN_EMAIL` e `ADMIN_PASSWORD`. Para uma configuração avançada, `ADMIN_PASSWORD_HASH` pode substituir `ADMIN_PASSWORD`, e `ADMIN_SESSION_SECRET` pode receber um segredo aleatório com pelo menos 32 caracteres. Para gerar o hash:
 
 ```bash
 node scripts/hash-admin-password.mjs "sua-senha-segura"
