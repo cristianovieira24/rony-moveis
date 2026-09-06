@@ -6,6 +6,7 @@ export type Category = {
   parentId: string | null;
   parentName: string | null;
   imageUrl: string;
+  imageFit: "cover" | "contain";
   active: boolean;
   featured: boolean;
   sortOrder: number;

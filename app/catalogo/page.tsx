@@ -1,7 +1,7 @@
 import { CatalogExplorer } from "@/components/catalog-explorer";
 import { getPublicSnapshot } from "@/lib/server-data";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 3600;
 
 export const metadata = {
   title: "Produtos | Rony Móveis",
@@ -12,4 +12,3 @@ export default async function CatalogPage() {
   const snapshot = await getPublicSnapshot();
   return <CatalogExplorer products={snapshot.products} categories={snapshot.categories} />;
 }
-

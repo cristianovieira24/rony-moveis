@@ -1,7 +1,8 @@
+import { revalidatePath, revalidateTag } from "next/cache";
 import { NextResponse } from "next/server";
 import { requireAdminApi } from "@/lib/admin-auth";
 import { deleteManagedBlobs, managedBlobKey } from "@/lib/blob-storage";
-import { getDatabase } from "@/lib/server-data";
+import { getDatabase, PUBLIC_DATA_TAG } from "@/lib/server-data";
 import { isSameOriginMutation } from "@/lib/security";
 import { categoryInputSchema } from "../route";
 
@@ -19,16 +20,18 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const db = await getDatabase();
     const previous = await db.prepare("SELECT object_key FROM categories WHERE id = ?").bind(id).first<{ object_key: string | null }>();
     await db.prepare(
-      `UPDATE categories SET slug = ?, name = ?, description = ?, parent_id = ?, image_url = ?, object_key = ?,
+      `UPDATE categories SET slug = ?, name = ?, description = ?, parent_id = ?, image_url = ?, image_fit = ?, object_key = ?,
        active = ?, featured = ?, sort_order = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
     ).bind(
       input.slug, input.name, input.description, input.parentId || null, input.imageUrl,
-      managedBlobKey(input.imageUrl), input.active ? 1 : 0, input.featured ? 1 : 0,
+      input.imageFit, managedBlobKey(input.imageUrl), input.active ? 1 : 0, input.featured ? 1 : 0,
       input.sortOrder, id,
     ).run();
     if (previous?.object_key && previous.object_key !== input.imageUrl) {
       try { await deleteManagedBlobs([previous.object_key]); } catch (error) { console.error("Falha ao remover imagem antiga da categoria", error); }
     }
+    revalidateTag(PUBLIC_DATA_TAG, "max");
+    revalidatePath("/", "layout");
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("Falha ao editar categoria", error);
@@ -48,11 +51,14 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   ).bind(id, id).first<{ products: string | number; children: string | number }>();
   if (Number(references?.products ?? 0) || Number(references?.children ?? 0)) {
     await db.prepare("UPDATE categories SET active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(id).run();
+    revalidateTag(PUBLIC_DATA_TAG, "max");
+    revalidatePath("/", "layout");
     return NextResponse.json({ ok: true, hidden: true });
   }
   const previous = await db.prepare("SELECT object_key FROM categories WHERE id = ?").bind(id).first<{ object_key: string | null }>();
   await db.prepare("DELETE FROM categories WHERE id = ?").bind(id).run();
   try { await deleteManagedBlobs([previous?.object_key]); } catch (error) { console.error("Falha ao remover imagem da categoria", error); }
+  revalidateTag(PUBLIC_DATA_TAG, "max");
+  revalidatePath("/", "layout");
   return NextResponse.json({ ok: true, hidden: false });
 }
-

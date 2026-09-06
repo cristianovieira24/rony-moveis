@@ -1,8 +1,9 @@
+import { revalidatePath, revalidateTag } from "next/cache";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAdminApi } from "@/lib/admin-auth";
 import { managedBlobKey } from "@/lib/blob-storage";
-import { getDatabase } from "@/lib/server-data";
+import { getDatabase, PUBLIC_DATA_TAG } from "@/lib/server-data";
 import { isSameOriginMutation } from "@/lib/security";
 
 export const dynamic = "force-dynamic";
@@ -19,6 +20,7 @@ export const categoryInputSchema = z.object({
   description: z.string().trim().max(500).default(""),
   parentId: z.string().max(100).nullable(),
   imageUrl: categoryImageSchema.default(""),
+  imageFit: z.enum(["cover", "contain"]).default("cover"),
   active: z.boolean(),
   featured: z.boolean(),
   sortOrder: z.number().int().min(0).max(10000),
@@ -35,13 +37,15 @@ export async function POST(request: Request) {
     const db = await getDatabase();
     await db.prepare(
       `INSERT INTO categories
-       (id, slug, name, description, parent_id, image_url, object_key, active, featured, sort_order, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+       (id, slug, name, description, parent_id, image_url, image_fit, object_key, active, featured, sort_order, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
     ).bind(
       id, input.slug, input.name, input.description, input.parentId || null,
-      input.imageUrl, managedBlobKey(input.imageUrl), input.active ? 1 : 0,
+      input.imageUrl, input.imageFit, managedBlobKey(input.imageUrl), input.active ? 1 : 0,
       input.featured ? 1 : 0, input.sortOrder,
     ).run();
+    revalidateTag(PUBLIC_DATA_TAG, "max");
+    revalidatePath("/", "layout");
     return NextResponse.json({ ok: true, id });
   } catch (error) {
     console.error("Falha ao criar categoria", error);

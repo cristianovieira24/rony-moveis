@@ -22,7 +22,7 @@ export function ProductDetail({ product }: { product: Product }) {
         <Link className="back-link" href="/catalogo"><ArrowLeft size={16} /> Voltar ao catálogo</Link>
         <div className="product-main-image">
           {product.badge && <span className="product-badge">{product.badge}</span>}
-          <img src={product.images[activeImage] || product.images[0]} alt={product.name} />
+          <img src={product.images[activeImage] || product.images[0]} alt={product.name} decoding="async" fetchPriority="high" />
           {product.images.length > 1 && (
             <div className="gallery-count">{activeImage + 1} / {product.images.length}</div>
           )}
@@ -31,7 +31,7 @@ export function ProductDetail({ product }: { product: Product }) {
           <div className="product-thumbnails">
             {product.images.map((image, index) => (
               <button className={index === activeImage ? "is-active" : ""} onClick={() => setActiveImage(index)} key={image} aria-label={`Ver imagem ${index + 1}`}>
-                <img src={image} alt="" />
+                <img src={image} alt="" loading="lazy" decoding="async" />
               </button>
             ))}
           </div>

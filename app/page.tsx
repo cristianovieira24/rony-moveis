@@ -16,7 +16,7 @@ import { CATEGORY_META_BY_SLUG } from "@/lib/category-meta";
 import { getPublicSnapshot } from "@/lib/server-data";
 import { whatsappUrl } from "@/lib/whatsapp";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 3600;
 
 export default async function Home() {
   const { products, categories, campaign, settings } = await getPublicSnapshot();
@@ -70,7 +70,7 @@ export default async function Home() {
 
         <div className="hero-visual" aria-label="Ambiente planejado Rony Móveis">
           <div className="hero-image-mask">
-            <img src={campaign.imageUrl} alt="Ambiente de escritório planejado" />
+            <img src={campaign.imageUrl} alt="Ambiente de escritório planejado" decoding="async" fetchPriority="high" />
           </div>
           <div className="hero-card hero-card-top">
             <span>Do produto ao projeto</span>
@@ -93,12 +93,12 @@ export default async function Home() {
           {mainCategories.map((category, index) => (
             <Link
               href={`/categoria/${category.slug}`}
-              className={`category-card category-card-${index + 1}`}
+              className={`category-card category-card-${index + 1} is-${category.imageFit}`}
               key={category.id}
               data-reveal
               style={{ "--delay": `${index * 60}ms` } as React.CSSProperties}
             >
-              <img src={category.imageUrl || CATEGORY_META_BY_SLUG[category.slug]?.image || "/images/spaces/loja-rony.webp"} alt="" loading="lazy" />
+              <img src={category.imageUrl || CATEGORY_META_BY_SLUG[category.slug]?.image || "/images/spaces/loja-rony.webp"} alt="" loading="lazy" decoding="async" />
               <span className="category-number">0{index + 1}</span>
               <div>
                 <h3>{category.name}</h3>

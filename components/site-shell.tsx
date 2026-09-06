@@ -49,8 +49,8 @@ export function SiteHeader({ categories }: { categories: Category[] }) {
                   </div>
                   <div className="category-mega-grid">
                     {mainCategories.map((category) => (
-                      <Link href={`/categoria/${category.slug}`} key={category.slug} onClick={() => setCategoriesOpen(false)}>
-                        <img src={category.imageUrl || CATEGORY_META_BY_SLUG[category.slug]?.image || "/images/spaces/loja-rony.webp"} alt="" />
+                      <Link className={`is-${category.imageFit}`} href={`/categoria/${category.slug}`} key={category.slug} onClick={() => setCategoriesOpen(false)}>
+                        <img src={category.imageUrl || CATEGORY_META_BY_SLUG[category.slug]?.image || "/images/spaces/loja-rony.webp"} alt="" loading="lazy" decoding="async" />
                         <span><small>{categories.some((item) => item.parentId === category.id) ? `${categories.filter((item) => item.parentId === category.id).length} linhas` : "Explore a categoria"}</small><strong>{category.name}</strong></span>
                         <ArrowUpRight size={16} />
                       </Link>

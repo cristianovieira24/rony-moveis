@@ -2,7 +2,7 @@ import { ArrowUpRight, Camera, Clock, Mail, MapPin, MessageCircle, Phone } from 
 import { getPublicSnapshot } from "@/lib/server-data";
 import { whatsappUrl } from "@/lib/whatsapp";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 3600;
 
 export const metadata = {
   title: "Contato e loja",
@@ -33,4 +33,3 @@ export default async function ContactPage() {
     </main>
   );
 }
-

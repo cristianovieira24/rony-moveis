@@ -22,10 +22,14 @@ export const DEFAULT_SITE_SETTINGS: SiteSettings = {
   seoDescription: "Móveis para casa e escritório, cadeiras, poltronas, estofados e projetos planejados com atendimento em Goiânia.",
 };
 
-function category(input: Omit<Category, "parentName" | "active" | "featured"> & Partial<Pick<Category, "parentName" | "active" | "featured">>): Category {
+function category(
+  input: Omit<Category, "parentName" | "active" | "featured" | "imageFit"> &
+    Partial<Pick<Category, "parentName" | "active" | "featured" | "imageFit">>,
+): Category {
   return {
     ...input,
     parentName: input.parentName ?? null,
+    imageFit: input.imageFit ?? "cover",
     active: input.active ?? true,
     featured: input.featured ?? true,
   };
@@ -39,6 +43,7 @@ export const seedCategories: Category[] = [
     description: "Conforto para receber, descansar e trabalhar melhor.",
     parentId: null,
     imageUrl: "/images/products/melfi.webp",
+    imageFit: "contain",
     sortOrder: 1,
   }),
   category({
@@ -75,6 +80,7 @@ export const seedCategories: Category[] = [
     description: "Peças que combinam presença, acabamento e conforto.",
     parentId: null,
     imageUrl: "/images/products/atlanta.webp",
+    imageFit: "contain",
     sortOrder: 5,
   }),
   category({
@@ -86,13 +92,49 @@ export const seedCategories: Category[] = [
     imageUrl: "/images/spaces/loja-rony.webp",
     sortOrder: 6,
   }),
-  category({ id: "cat-presidente", slug: "cadeiras-presidente", name: "Cadeiras Presidente", description: "Conforto, presença e apoio para jornadas mais longas.", parentId: "cat-cadeiras", imageUrl: "/images/spaces/cadeiras-escritorio.webp", sortOrder: 21 }),
-  category({ id: "cat-executiva", slug: "cadeiras-executivas", name: "Cadeiras Executivas", description: "Ergonomia e acabamento para escritórios e home office.", parentId: "cat-cadeiras", imageUrl: "/images/spaces/mesa-escritorio.webp", sortOrder: 22 }),
-  category({ id: "cat-diretor", slug: "cadeiras-diretor", name: "Cadeiras Diretor", description: "Modelos versáteis para estações, salas e escritórios.", parentId: "cat-cadeiras", imageUrl: "/images/spaces/escritorio-planejado.webp", sortOrder: 23 }),
-  category({ id: "cat-secretaria", slug: "cadeiras-secretaria", name: "Cadeiras Secretária", description: "Opções funcionais para a rotina de trabalho.", parentId: "cat-cadeiras", imageUrl: "/images/spaces/cadeiras-escritorio.webp", sortOrder: 24 }),
+  category({ id: "cat-presidente", slug: "cadeiras-presidente", name: "Cadeiras Presidente", description: "Conforto, presença e apoio para jornadas mais longas.", parentId: "cat-cadeiras", imageUrl: "/images/legacy-chairs/presidente-01.webp", imageFit: "contain", sortOrder: 21 }),
+  category({ id: "cat-executiva", slug: "cadeiras-executivas", name: "Cadeiras Executivas", description: "Ergonomia e acabamento para escritórios e home office.", parentId: "cat-cadeiras", imageUrl: "/images/legacy-chairs/executiva-01.webp", imageFit: "contain", sortOrder: 22 }),
+  category({ id: "cat-diretor", slug: "cadeiras-diretor", name: "Cadeiras Diretor", description: "Modelos versáteis para estações, salas e escritórios.", parentId: "cat-cadeiras", imageUrl: "/images/legacy-chairs/diretor-01.webp", imageFit: "contain", sortOrder: 23 }),
+  category({ id: "cat-secretaria", slug: "cadeiras-secretaria", name: "Cadeiras Secretária", description: "Opções funcionais para a rotina de trabalho.", parentId: "cat-cadeiras", imageUrl: "/images/legacy-chairs/secretaria-01.webp", imageFit: "contain", sortOrder: 24 }),
   category({ id: "cat-gamer", slug: "cadeiras-gamer", name: "Cadeiras Gamer", description: "Apoio e estilo para jogos, estudo e trabalho.", parentId: "cat-cadeiras", imageUrl: "/images/spaces/cadeiras-escritorio.webp", sortOrder: 25 }),
   category({ id: "cat-banquetas", slug: "banquetas", name: "Banquetas", description: "Modelos para bancadas, cozinhas e ambientes comerciais.", parentId: "cat-cadeiras", imageUrl: "/images/spaces/cozinha-cobre.webp", sortOrder: 26 }),
 ];
+
+const legacyChairGroups = [
+  { key: "presidente", label: "Presidente", categoryId: "cat-presidente", categorySlug: "cadeiras-presidente", categoryName: "Cadeiras Presidente", count: 4, order: 110 },
+  { key: "executiva", label: "Executiva", categoryId: "cat-executiva", categorySlug: "cadeiras-executivas", categoryName: "Cadeiras Executivas", count: 4, order: 120 },
+  { key: "diretor", label: "Diretor", categoryId: "cat-diretor", categorySlug: "cadeiras-diretor", categoryName: "Cadeiras Diretor", count: 4, order: 130 },
+  { key: "secretaria", label: "Secretária", categoryId: "cat-secretaria", categorySlug: "cadeiras-secretaria", categoryName: "Cadeiras Secretária", count: 3, order: 140 },
+] as const;
+
+const legacyChairProducts: Product[] = legacyChairGroups.flatMap((group) =>
+  Array.from({ length: group.count }, (_, index) => {
+    const number = String(index + 1).padStart(2, "0");
+    return {
+      id: `prod-cadeira-${group.key}-${number}`,
+      slug: `cadeira-${group.key}-modelo-${number}`,
+      name: `Cadeira ${group.label} — Modelo ${number}`,
+      eyebrow: `${group.label} · consulte condições`,
+      shortDescription: `Modelo da linha ${group.label.toLocaleLowerCase("pt-BR")} disponível para consulta na Rony Móveis.`,
+      description: `Cadeira da linha ${group.label.toLocaleLowerCase("pt-BR")} apresentada no catálogo da Rony Móveis. Consulte a equipe para confirmar medidas, cores, revestimentos, recursos e disponibilidade atual.`,
+      categoryId: group.categoryId,
+      categorySlug: group.categorySlug,
+      categoryName: group.categoryName,
+      priceCents: null,
+      oldPriceCents: null,
+      priceLabel: "Preço sob consulta",
+      priceMode: "consult" as const,
+      availability: "available" as const,
+      searchTerms: `cadeira escritório ${group.label.toLocaleLowerCase("pt-BR")} modelo ${number} goiânia`,
+      badge: "Consulte",
+      features: ["Preço sob consulta", "Consulte cores e acabamentos", "Confirme a disponibilidade"],
+      images: [`/images/legacy-chairs/${group.key}-${number}.webp`],
+      active: true,
+      featured: false,
+      sortOrder: group.order + index,
+    };
+  }),
+);
 
 export const seedProducts: Product[] = [
   {
@@ -311,6 +353,7 @@ export const seedProducts: Product[] = [
     featured: false,
     sortOrder: 9,
   },
+  ...legacyChairProducts,
 ];
 
 export const seedCampaign: Campaign = {

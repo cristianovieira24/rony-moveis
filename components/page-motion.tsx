@@ -1,8 +1,11 @@
 "use client";
 
 import { useEffect } from "react";
+import { usePathname } from "next/navigation";
 
 export function PageMotion() {
+  const pathname = usePathname();
+
   useEffect(() => {
     const items = Array.from(document.querySelectorAll<HTMLElement>("[data-reveal]"));
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -10,6 +13,12 @@ export function PageMotion() {
       items.forEach((item) => item.classList.add("is-visible"));
       return;
     }
+
+    items.forEach((item) => {
+      const rect = item.getBoundingClientRect();
+      if (rect.top < window.innerHeight * 1.05 && rect.bottom > 0) item.classList.add("is-visible");
+    });
+    document.documentElement.classList.add("motion-ready");
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -22,7 +31,7 @@ export function PageMotion() {
       },
       { threshold: 0.12, rootMargin: "0px 0px -7%" },
     );
-    items.forEach((item) => observer.observe(item));
+    items.filter((item) => !item.classList.contains("is-visible")).forEach((item) => observer.observe(item));
 
     let frame = 0;
     const onScroll = () => {
@@ -39,9 +48,9 @@ export function PageMotion() {
       observer.disconnect();
       window.removeEventListener("scroll", onScroll);
       if (frame) window.cancelAnimationFrame(frame);
+      document.documentElement.classList.remove("motion-ready");
     };
-  }, []);
+  }, [pathname]);
 
   return <div className="scroll-progress" aria-hidden="true" />;
 }
-

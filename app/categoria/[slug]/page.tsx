@@ -7,7 +7,7 @@ import { CATEGORY_META_BY_SLUG } from "@/lib/category-meta";
 import { getPublicSnapshot } from "@/lib/server-data";
 import { whatsappUrl } from "@/lib/whatsapp";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 3600;
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
@@ -51,8 +51,8 @@ export default async function CategoryPage({ params }: { params: Promise<{ slug:
             Consultar esta categoria <MessageCircle size={18} />
           </a>
         </div>
-        <div className="category-page-image">
-          <img src={category.imageUrl || meta?.heroImage || meta?.image || "/images/spaces/loja-rony.webp"} alt={category.name} />
+        <div className={`category-page-image is-${category.imageFit}`}>
+          <img src={category.imageUrl || meta?.heroImage || meta?.image || "/images/spaces/loja-rony.webp"} alt={category.name} decoding="async" fetchPriority="high" />
           <div>
             <span>{products.length ? String(products.length).padStart(2, "0") : "Loja"}</span>
             <small>{products.length ? (products.length === 1 ? "item no catálogo" : "itens no catálogo") : "consulte opções"}</small>
@@ -96,8 +96,8 @@ export default async function CategoryPage({ params }: { params: Promise<{ slug:
           {otherCategories.map((item, index) => {
             const itemMeta = CATEGORY_META_BY_SLUG[item.slug];
             return (
-              <Link href={`/categoria/${item.slug}`} key={item.id} data-reveal style={{ "--delay": `${index * 50}ms` } as React.CSSProperties}>
-                <img src={item.imageUrl || itemMeta?.image || "/images/spaces/loja-rony.webp"} alt="" loading="lazy" />
+              <Link className={`is-${item.imageFit}`} href={`/categoria/${item.slug}`} key={item.id} data-reveal style={{ "--delay": `${index * 50}ms` } as React.CSSProperties}>
+                <img src={item.imageUrl || itemMeta?.image || "/images/spaces/loja-rony.webp"} alt="" loading="lazy" decoding="async" />
                 <div><span>{itemMeta?.kicker}</span><strong>{item.name}</strong></div>
                 <ArrowUpRight size={18} />
               </Link>

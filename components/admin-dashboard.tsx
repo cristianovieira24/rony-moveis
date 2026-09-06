@@ -68,6 +68,7 @@ const emptyCategory: CategoryDraft = {
   description: "",
   parentId: null,
   imageUrl: "",
+  imageFit: "cover",
   active: true,
   featured: true,
   sortOrder: 100,
@@ -469,11 +470,11 @@ export function AdminDashboard({
               <div className="admin-category-list">
                 {categories.map((category) => (
                   <article className={!category.active ? "is-muted" : ""} key={category.id}>
-                    <img src={category.imageUrl || "/images/spaces/loja-rony.webp"} alt="" />
+                    <img className={`is-${category.imageFit}`} src={category.imageUrl || "/images/spaces/loja-rony.webp"} alt="" loading="lazy" decoding="async" />
                     <div><span>{category.parentName ? `Subcategoria de ${category.parentName}` : "Categoria principal"}</span><strong>{category.name}</strong><small>/{category.slug}</small></div>
                     <p>{category.description || "Sem descrição"}</p>
                     <em className={category.active ? "is-active" : ""}>{category.active ? "Visível" : "Oculta"}</em>
-                    <div className="admin-row-actions"><button onClick={() => setCategoryDraft({ id: category.id, slug: category.slug, name: category.name, description: category.description, parentId: category.parentId, imageUrl: category.imageUrl, active: category.active, featured: category.featured, sortOrder: category.sortOrder })} aria-label={`Editar ${category.name}`}><Pencil size={16} /></button><button onClick={() => deleteCategory(category)} aria-label={`Remover ${category.name}`}><Trash2 size={16} /></button></div>
+                    <div className="admin-row-actions"><button onClick={() => setCategoryDraft({ id: category.id, slug: category.slug, name: category.name, description: category.description, parentId: category.parentId, imageUrl: category.imageUrl, imageFit: category.imageFit, active: category.active, featured: category.featured, sortOrder: category.sortOrder })} aria-label={`Editar ${category.name}`}><Pencil size={16} /></button><button onClick={() => deleteCategory(category)} aria-label={`Remover ${category.name}`}><Trash2 size={16} /></button></div>
                   </article>
                 ))}
               </div>
@@ -556,8 +557,9 @@ export function AdminDashboard({
               </div>
               <div className="product-image-editor category-image-editor">
                 <div className="product-image-editor-head"><div><FileImage size={18} /><span>Imagem da categoria</span></div><input ref={categoryFileRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => event.target.files?.[0] && uploadCategoryImage(event.target.files[0])} /><button onClick={() => categoryFileRef.current?.click()} disabled={uploading}>{uploading ? <LoaderCircle className="spin" size={16} /> : <Upload size={16} />} Enviar foto</button></div>
-                {categoryDraft.imageUrl ? <div className="category-image-preview"><img src={categoryDraft.imageUrl} alt="" /><button onClick={() => setCategoryDraft({ ...categoryDraft, imageUrl: "" })}><Trash2 size={15} /> Remover imagem</button></div> : <div className="product-image-empty"><ImagePlus size={28} /><strong>Adicione uma imagem</strong><span>Ela aparecerá no menu e na página da categoria.</span></div>}
+                {categoryDraft.imageUrl ? <div className={`category-image-preview is-${categoryDraft.imageFit}`}><img src={categoryDraft.imageUrl} alt="" decoding="async" /><button onClick={() => setCategoryDraft({ ...categoryDraft, imageUrl: "" })}><Trash2 size={15} /> Remover imagem</button></div> : <div className="product-image-empty"><ImagePlus size={28} /><strong>Adicione uma imagem</strong><span>Ela aparecerá no menu e na página da categoria.</span></div>}
                 <label className="manual-image-url"><span>Ou use um endereço de imagem</span><div><input value={categoryDraft.imageUrl} onChange={(event) => setCategoryDraft({ ...categoryDraft, imageUrl: event.target.value })} placeholder="/images/… ou https://…" /></div></label>
+                <label className="manual-image-url"><span>Enquadramento na página da categoria</span><select value={categoryDraft.imageFit} onChange={(event) => setCategoryDraft({ ...categoryDraft, imageFit: event.target.value as CategoryDraft["imageFit"] })}><option value="contain">Mostrar o produto inteiro</option><option value="cover">Preencher o espaço — foto de ambiente</option></select><small>Para cadeiras e produtos isolados, use “Mostrar o produto inteiro”.</small></label>
               </div>
             </div>
             <footer><button className="admin-secondary" onClick={() => setCategoryDraft(null)}>Cancelar</button><button className="admin-primary" onClick={saveCategory} disabled={saving}>{saving ? <LoaderCircle className="spin" size={17} /> : <Check size={17} />}{saving ? "Salvando…" : "Salvar categoria"}</button></footer>

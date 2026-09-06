@@ -1,7 +1,8 @@
+import { revalidatePath, revalidateTag } from "next/cache";
 import { NextResponse } from "next/server";
 import { requireAdminApi } from "@/lib/admin-auth";
 import { deleteManagedBlobs, managedBlobKey } from "@/lib/blob-storage";
-import { getDatabase } from "@/lib/server-data";
+import { getDatabase, PUBLIC_DATA_TAG } from "@/lib/server-data";
 import { isSameOriginMutation } from "@/lib/security";
 import { productInputSchema } from "../route";
 
@@ -75,6 +76,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     } catch (error) {
       console.error("Falha ao remover imagens antigas do produto", error);
     }
+    revalidateTag(PUBLIC_DATA_TAG, "max");
+    revalidatePath("/", "layout");
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("Falha ao editar produto", error);
@@ -98,5 +101,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   } catch (error) {
     console.error("Falha ao remover imagens do produto excluído", error);
   }
+  revalidateTag(PUBLIC_DATA_TAG, "max");
+  revalidatePath("/", "layout");
   return NextResponse.json({ ok: true });
 }

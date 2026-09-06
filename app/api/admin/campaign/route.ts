@@ -1,8 +1,9 @@
+import { revalidatePath, revalidateTag } from "next/cache";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAdminApi } from "@/lib/admin-auth";
 import { deleteManagedBlobs, managedBlobKey } from "@/lib/blob-storage";
-import { getDatabase } from "@/lib/server-data";
+import { getDatabase, PUBLIC_DATA_TAG } from "@/lib/server-data";
 import { isSameOriginMutation } from "@/lib/security";
 
 export const dynamic = "force-dynamic";
@@ -55,5 +56,7 @@ export async function PATCH(request: Request) {
       console.error("Falha ao remover imagem antiga do destaque", error);
     }
   }
+  revalidateTag(PUBLIC_DATA_TAG, "max");
+  revalidatePath("/", "layout");
   return NextResponse.json({ ok: true });
 }

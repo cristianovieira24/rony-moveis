@@ -1,8 +1,9 @@
+import { revalidatePath, revalidateTag } from "next/cache";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAdminApi } from "@/lib/admin-auth";
 import { managedBlobKey } from "@/lib/blob-storage";
-import { getDatabase } from "@/lib/server-data";
+import { getDatabase, PUBLIC_DATA_TAG } from "@/lib/server-data";
 import { isSameOriginMutation } from "@/lib/security";
 
 export const dynamic = "force-dynamic";
@@ -85,6 +86,8 @@ export async function POST(request: Request) {
   ];
   try {
     await db.batch(statements);
+    revalidateTag(PUBLIC_DATA_TAG, "max");
+    revalidatePath("/", "layout");
     return NextResponse.json({ ok: true, id });
   } catch (error) {
     console.error("Falha ao criar produto", error);
