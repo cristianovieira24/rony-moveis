@@ -13,6 +13,7 @@ export async function POST(request: Request) {
     const response = await handleUpload({
       request,
       body,
+      token: process.env.RONY_BLOB_READ_WRITE_TOKEN,
       onBeforeGenerateToken: async (pathname) => {
         if (!pathname.startsWith("quotes/")) throw new Error("Destino de upload inválido.");
         return {
