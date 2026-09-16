@@ -144,7 +144,7 @@ async function prepareSeedData() {
     .prepare("SELECT value FROM site_settings WHERE key = ?")
     .bind("seed_version")
     .first<{ value: string }>();
-  if (marker?.value === "4") return;
+  if (marker?.value === "5") return;
 
   const statements: Statement[] = [];
   for (const category of seedCategories) {
@@ -279,6 +279,13 @@ async function prepareSeedData() {
   }
 
   statements.push(
+    db.prepare(
+      `UPDATE products SET active = 0, updated_at = CURRENT_TIMESTAMP
+       WHERE id LIKE 'prod-cadeira-%' AND name LIKE '%Modelo%'`,
+    ),
+  );
+
+  statements.push(
     db
       .prepare(
         `INSERT INTO site_settings (key, value, updated_at)
@@ -318,7 +325,7 @@ async function prepareSeedData() {
          VALUES (?, ?, CURRENT_TIMESTAMP)
          ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP`,
       )
-      .bind("seed_version", "4"),
+      .bind("seed_version", "5"),
   );
 
   await db.batch(statements);

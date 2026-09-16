@@ -1,4 +1,5 @@
 import type { Campaign, Category, Product, SiteSettings } from "./types";
+import { september2026ChairProducts } from "./chair-catalog-2026";
 
 export const WHATSAPP_NUMBER = "5562999981746";
 export const STORE_PHONE = "(62) 99998-1746";
@@ -373,7 +374,10 @@ export const seedProducts: Product[] = [
     searchTerms: "cadeira florenca florença alta rodizio rodízio preta presidente escritorio",
     badge: "Catálogo da loja",
     features: ["Encosto alto", "Base com rodízios", "Consulte regulagens e medidas"],
-    images: ["/images/rony-originals/home-produto-01.webp"],
+    images: [
+      "/images/rony-originals/home-produto-01.webp",
+      "/images/cadeiras-setembro-2026/florenca-showroom.webp",
+    ],
     active: true,
     featured: false,
     sortOrder: 100,
@@ -442,12 +446,16 @@ export const seedProducts: Product[] = [
     searchTerms: "cadeira executiva base fixa office gomada reuniao atendimento",
     badge: "Catálogo da loja",
     features: ["Base fixa", "Assento e encosto gomados", "Consulte cores disponíveis"],
-    images: ["/images/rony-originals/home-produto-04.webp"],
+    images: [
+      "/images/rony-originals/home-produto-04.webp",
+      "/images/cadeiras-setembro-2026/executiva-fixa-gomada-marrom.webp",
+    ],
     active: true,
     featured: false,
     sortOrder: 103,
   },
   ...legacyChairProducts,
+  ...september2026ChairProducts,
 ];
 
 export const seedCampaign: Campaign = {
